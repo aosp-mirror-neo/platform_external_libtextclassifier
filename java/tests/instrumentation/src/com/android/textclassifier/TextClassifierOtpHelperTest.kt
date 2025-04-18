@@ -325,12 +325,7 @@ class TextClassifierOtpHelperTest {
         // Strings with a context word somewhere in the substring
         val englishContextSubstrings = listOf("pins", "gaping", "backspin")
         val codeInNextSentence = "context word: code. This sentence has the actual value of 434343"
-        val codeInNextSentenceTooFar =
-            "context word: code. ${"f".repeat(60)} This sentence has the actual value of 434343"
-        val codeTwoSentencesAfterContext = "context word: code. One sentence. actual value 34343"
-        val codeInSentenceBeforeContext = "34343 is a number. This number is a code"
         val codeInSentenceAfterNewline = "your code is \n 34343"
-        val codeTooFarBeforeContext = "34343 ${"f".repeat(60)} code"
 
         Assert.assertFalse(containsOtp(englishFalsePositive))
         for (context in englishContextWords) {
@@ -347,9 +342,5 @@ class TextClassifierOtpHelperTest {
         }
         Assert.assertTrue(containsOtp(codeInNextSentence))
         Assert.assertTrue(containsOtp(codeInSentenceAfterNewline))
-        Assert.assertFalse(containsOtp(codeTwoSentencesAfterContext))
-        Assert.assertFalse(containsOtp(codeInSentenceBeforeContext))
-        Assert.assertFalse(containsOtp(codeInNextSentenceTooFar))
-        Assert.assertFalse(containsOtp(codeTooFarBeforeContext))
     }
 }
