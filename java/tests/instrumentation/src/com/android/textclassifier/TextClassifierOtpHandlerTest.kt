@@ -37,7 +37,7 @@ import org.mockito.Mockito
 import org.mockito.MockitoAnnotations
 
 @RunWith(AndroidJUnit4::class)
-class TextClassifierOtpHelperTest {
+class TextClassifierOtpHandlerTest {
     @Mock
     private lateinit var modelFileManager: ModelFileManager
 
@@ -90,7 +90,7 @@ class TextClassifierOtpHelperTest {
     }
 
     private fun containsOtp(text: String): Boolean {
-        return TextClassifierOtpHelper.containsOtp(
+        return TextClassifierOtpHandler.containsOtp(
             text,
             this.tcImpl,
         )
@@ -100,111 +100,6 @@ class TextClassifierOtpHelperTest {
     fun testOtpDetection() {
         Assert.assertFalse(containsOtp("hello"))
         Assert.assertTrue(containsOtp("Your OTP code is 123456"))
-    }
-
-    @Test
-    fun testContainsOtpLikePattern_length() {
-        val tooShortAlphaNum = "123G"
-        val tooShortNumOnly = "123"
-        val minLenAlphaNum = "123G5"
-        val minLenNumOnly = "1235"
-        val twoTriplets = "123 456"
-        val tooShortTriplets = "12 345"
-        val maxLen = "123456F8"
-        val tooLong = "123T56789"
-
-        Assert.assertTrue(TextClassifierOtpHelper.containsOtpLikePattern(minLenAlphaNum))
-        Assert.assertTrue(TextClassifierOtpHelper.containsOtpLikePattern(minLenNumOnly))
-        Assert.assertTrue(TextClassifierOtpHelper.containsOtpLikePattern(maxLen))
-        Assert.assertFalse(
-            "$tooShortAlphaNum is too short",
-            TextClassifierOtpHelper.containsOtpLikePattern(tooShortAlphaNum)
-        )
-        Assert.assertFalse(
-            "$tooShortNumOnly is too short",
-            TextClassifierOtpHelper.containsOtpLikePattern(tooShortNumOnly)
-        )
-        Assert.assertFalse(
-            "$tooLong is too long",
-            TextClassifierOtpHelper.containsOtpLikePattern(tooLong)
-        )
-        Assert.assertTrue(TextClassifierOtpHelper.containsOtpLikePattern(twoTriplets))
-        Assert.assertFalse(
-            "$tooShortTriplets is too short",
-            TextClassifierOtpHelper.containsOtpLikePattern(tooShortTriplets)
-        )
-    }
-
-    @Test
-    fun testContainsOtpLikePattern_acceptsNonRomanAlphabeticalChars() {
-        val lowercase = "123ķ4"
-        val uppercase = "123Ŀ4"
-        val ideographicInMiddle = "123码456"
-
-        Assert.assertTrue(TextClassifierOtpHelper.containsOtpLikePattern(lowercase))
-        Assert.assertTrue(TextClassifierOtpHelper.containsOtpLikePattern(uppercase))
-        Assert.assertFalse(TextClassifierOtpHelper.containsOtpLikePattern(ideographicInMiddle))
-    }
-
-    @Test
-    fun testContainsOtpLikePattern_dashes() {
-        val oneDash = "G-3d523"
-        val manyDashes = "G-FD-745"
-        val tooManyDashes = "6--7893"
-        val oopsAllDashes = "------"
-
-        Assert.assertTrue(TextClassifierOtpHelper.containsOtpLikePattern(oneDash))
-        Assert.assertTrue(TextClassifierOtpHelper.containsOtpLikePattern(oneDash))
-        Assert.assertTrue(TextClassifierOtpHelper.containsOtpLikePattern(manyDashes))
-        Assert.assertFalse(TextClassifierOtpHelper.containsOtpLikePattern(tooManyDashes))
-        Assert.assertFalse(TextClassifierOtpHelper.containsOtpLikePattern(oopsAllDashes))
-    }
-
-    @Test
-    fun testContainsOtpLikePattern_lookaheadMustBeOtpChar() {
-        val validLookahead = "g4zy75"
-        val spaceLookahead = "GVRXY 2"
-        Assert.assertTrue(TextClassifierOtpHelper.containsOtpLikePattern(validLookahead))
-        Assert.assertFalse(TextClassifierOtpHelper.containsOtpLikePattern(spaceLookahead))
-    }
-
-    @Test
-    fun testContainsOtpLikePattern_dateExclusion() {
-        val date = "01-01-2001"
-        val singleDigitDate = "1-1-2001"
-        val twoDigitYear = "1-1-01"
-        val dateWithOtpAfter = "1-1-01 is the date of your code T3425"
-        val dateWithOtpBefore = "your code 54-234-3 was sent on 1-1-01"
-        val otpWithDashesButInvalidDate = "34-58-30"
-        val otpWithDashesButInvalidYear = "12-1-3089"
-
-        Assert.assertFalse(TextClassifierOtpHelper.containsOtpLikePattern(date))
-        Assert.assertFalse(TextClassifierOtpHelper.containsOtpLikePattern(singleDigitDate))
-        Assert.assertFalse(TextClassifierOtpHelper.containsOtpLikePattern(twoDigitYear))
-
-        Assert.assertTrue(TextClassifierOtpHelper.containsOtpLikePattern(dateWithOtpAfter))
-        Assert.assertTrue(TextClassifierOtpHelper.containsOtpLikePattern(dateWithOtpBefore))
-        Assert.assertTrue(
-            TextClassifierOtpHelper.containsOtpLikePattern(otpWithDashesButInvalidDate)
-        )
-        Assert.assertTrue(
-            TextClassifierOtpHelper.containsOtpLikePattern(otpWithDashesButInvalidYear)
-        )
-    }
-
-    @Test
-    fun testContainsOtpLikePattern_phoneExclusion() {
-        val parens = "(888) 8888888"
-        val allSpaces = "888 888 8888"
-        val withDash = "(888) 888-8888"
-        val allDashes = "888-888-8888"
-        val allDashesWithParen = "(888)-888-8888"
-
-        Assert.assertFalse(TextClassifierOtpHelper.containsOtpLikePattern(parens))
-        Assert.assertFalse(TextClassifierOtpHelper.containsOtpLikePattern(allSpaces))
-        Assert.assertFalse(TextClassifierOtpHelper.containsOtpLikePattern(withDash))
-        Assert.assertFalse(TextClassifierOtpHelper.containsOtpLikePattern(allDashes))
-        Assert.assertFalse(TextClassifierOtpHelper.containsOtpLikePattern(allDashesWithParen))
     }
 
     @Test
