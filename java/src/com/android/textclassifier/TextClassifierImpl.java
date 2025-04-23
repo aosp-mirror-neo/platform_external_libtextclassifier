@@ -298,7 +298,7 @@ final class TextClassifierImpl {
 
     if (TextClassifierUtils.isOtpClassificationEnabled() && entitiesToIdentify.contains(
             TextClassifierUtils.TYPE_OTP)) {
-      TextClassifierOtpHelper.addOtpLink(request.getText().toString(), this, builder);
+      TextClassifierOtpHandler.addOtpLink(request.getText().toString(), this, builder);
     }
 
     final String localesString = concatenateLocales(request.getDefaultLocales());
