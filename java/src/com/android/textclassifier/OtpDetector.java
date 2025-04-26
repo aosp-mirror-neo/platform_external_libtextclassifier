@@ -18,33 +18,25 @@ package com.android.textclassifier;
 import static java.lang.String.format;
 
 import android.icu.util.ULocale;
-import android.os.Bundle;
 import android.util.ArrayMap;
+import android.view.textclassifier.TextClassifier;
 import android.view.textclassifier.TextLanguage;
-import android.view.textclassifier.TextLinks;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.android.textclassifier.common.base.TcLog;
-import com.android.textclassifier.utils.TextClassifierUtils;
-
-import com.google.common.annotations.VisibleForTesting;
-
-import java.io.IOException;
-import java.util.Collections;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Class with helper methods related to detecting OTP codes in a text.
+ * Class with helper methods to detecting One-Time Password (OTP) codes in a text.
+ *
+ * <p>This class is designed to be lightweight with minimal dependencies, allowing it
+ * to be easily exported and built as a standalone library.
  */
-public class TextClassifierOtpHelper {
-  private static final String TAG = TextClassifierOtpHelper.class.getSimpleName();
-
+public class OtpDetector {
   private static final int PATTERN_FLAGS =
       Pattern.DOTALL | Pattern.CASE_INSENSITIVE | Pattern.MULTILINE;
 
@@ -89,43 +81,53 @@ public class TextClassifierOtpHelper {
   }
 
   /**
-   * Checks if the text might contain an OTP, if so, adds a link to the builder with type as OTP
-   *
-   * @param text    The text whose content should be checked for OTP
-   * @param tcImpl  Instance of the TextClassifierImpl
-   * @param builder TextLinks builder object to whom the OTP link to be added
-   */
-  public static void addOtpLink(@NonNull String text, @NonNull TextClassifierImpl tcImpl,
-          @NonNull TextLinks.Builder builder) {
-    if (!containsOtp(text, tcImpl)) {
-      return;
-    }
-    final Map<String, Float> entityScores = Collections.singletonMap(TextClassifierUtils.TYPE_OTP,
-            1f);
-    builder.addLink(0, 0, entityScores, new Bundle());
-  }
-
-  /**
    * Checks if a string of text might contain an OTP, based on several regular expressions, and
-   * potentially using a textClassifier to eliminate false positives
+   * potentially using a textClassifier to eliminate false positives.
    *
-   * @param text   The text whose content should be checked
-   * @param tcImpl If non null, the provided TextClassifierImpl will be used to find the language
-   *               of the text, and look for a language-specific regex for it.
-   * @return True if we believe an OTP is in the message, false otherwise.
+   * <p><b>Note:</b> This method is meant to be called in Android V only. Android B+ should make
+   * TextClassifier request to determine if the text contains OTP.</p>
+   *
+   * <p><b>Important:</b> Signature of this method to be kept intact since it is intended for
+   * use by external modules via an exported library.
+   *
+   * @param text The input text to scan for OTP keywords. Must not be null.
+   * @param tc TextClassifier instance to be used to find the language of the text.
+   * @return {@code true} if an OTP is determined to be in the text, {@code false} otherwise.
    */
-  protected static boolean containsOtp(
+  public static boolean containsOtp(
           @NonNull String text,
-          @NonNull TextClassifierImpl tcImpl) {
+          @NonNull TextClassifier tc) {
     if (!containsOtpLikePattern(text)) {
       return false;
     }
 
-    ULocale language = getLanguageWithRegex(text, tcImpl);
-    if (language == null) {
+    TextLanguage language = getTextLanguage(text, tc);
+    return containsOtpWithLanguage(text, language);
+  }
+
+  /**
+   * Checks if the input text likely contains a language-specific keyword commonly associated with
+   * OTP, based on the provided language hint.
+   *
+   * <p>This method first attempts to determine a high-confidence {@link ULocale} corresponding to
+   * the given {@link TextLanguage}. If a reliable locale cannot be determined, it assumes no
+   * relevant OTP keyword is present for that language. Otherwise, it delegates to
+   * {@link #hasLanguageSpecificOtpWord} to perform the actual check using the language tag derived
+   * from the determined locale.
+   *
+   * @param text The input text to scan for OTP keywords. Must not be null.
+   * @param language The language hint for the input text, used to determine the appropriate locale
+   * for keyword matching. Must not be null.
+   * @return {@code true} if the text is determined to contain a language-specific OTP keyword
+   * matching the language hint, {@code false} otherwise (including cases where the language
+   * could not be confidently identified or no specific OTP keyword is found).
+   */
+  protected static boolean containsOtpWithLanguage(@NonNull String text, @NonNull TextLanguage language) {
+    ULocale uLocale = getLanguageWithRegex(language);
+    if (uLocale == null) {
       return false;
     }
-    return hasLanguageSpecificOtpWord(text, language.toLanguageTag());
+    return hasLanguageSpecificOtpWord(text, uLocale.toLanguageTag());
   }
 
   /**
@@ -138,7 +140,6 @@ public class TextClassifierOtpHelper {
    * @param text The text to be checked.
    * @return {@code true} if the text contains an OTP-like pattern, {@code false} otherwise.
    */
-  @VisibleForTesting
   protected static boolean containsOtpLikePattern(String text) {
     Set<String> otpMatches = getAllMatches(text, OTP_REGEX.get());
     if (otpMatches.isEmpty()) {
@@ -179,8 +180,7 @@ public class TextClassifierOtpHelper {
    * @return {@code true} if the text contains a language-specific OTP word, {@code false} otherwise.
    *         Returns {@code false} if no language-specific regex is defined for the given tag.
    */
-  @VisibleForTesting
-  protected static boolean hasLanguageSpecificOtpWord(@NonNull String text, @NonNull String languageTag) {
+  private static boolean hasLanguageSpecificOtpWord(@NonNull String text, @NonNull String languageTag) {
     if (!EXTRA_LANG_OTP_REGEX.containsKey(languageTag)){
       return false;
     }
@@ -201,27 +201,24 @@ public class TextClassifierOtpHelper {
     return matches;
   }
 
-  // Tries to determine the language of the given text. Will return the language with the highest
-  // confidence score that meets the minimum threshold, and has a language-specific regex, null
-  // otherwise
+  // Tries to determine the language of the given text.
+  private static TextLanguage getTextLanguage(@NonNull String text, @NonNull TextClassifier tc) {
+    TextLanguage.Request langRequest = new TextLanguage.Request.Builder(text).build();
+    return tc.detectLanguage(langRequest);
+  }
+
+  // Will return the language with the highest confidence score that meets the minimum threshold,
+  // and has a language-specific regex, null otherwise
   @Nullable
-  private static ULocale getLanguageWithRegex(String text, @NonNull TextClassifierImpl tcImpl) {
+  private static ULocale getLanguageWithRegex(@NonNull TextLanguage lang) {
     float highestConfidence = 0;
     ULocale highestConfidenceLocale = null;
-    TextLanguage.Request langRequest = new TextLanguage.Request.Builder(text).build();
-    TextLanguage lang;
-    try {
-      lang = tcImpl.detectLanguage(null, null, langRequest);
-    } catch (IOException e) {
-      TcLog.e(TAG, "Except detecting language", e);
-      return null;
-    }
     for (int i = 0; i < lang.getLocaleHypothesisCount(); i++) {
       ULocale locale = lang.getLocale(i);
       float confidence = lang.getConfidenceScore(locale);
       if (confidence >= TC_THRESHOLD
-          && confidence >= highestConfidence
-          && EXTRA_LANG_OTP_REGEX.containsKey(locale.toLanguageTag())) {
+              && confidence >= highestConfidence
+              && EXTRA_LANG_OTP_REGEX.containsKey(locale.toLanguageTag())) {
         highestConfidence = confidence;
         highestConfidenceLocale = locale;
       }
@@ -229,7 +226,7 @@ public class TextClassifierOtpHelper {
     return highestConfidenceLocale;
   }
 
-  private TextClassifierOtpHelper() {}
+  private OtpDetector() {}
 
   private static class RegExStrings {
     /*
