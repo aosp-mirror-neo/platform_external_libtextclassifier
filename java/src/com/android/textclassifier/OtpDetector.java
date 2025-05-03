@@ -77,7 +77,7 @@ public class OtpDetector {
 
   static {
     EXTRA_LANG_OTP_REGEX.put(
-        ULocale.ENGLISH.toLanguageTag(), createDictionaryRegex(RegExStrings.ENGLISH_CONTEXT_WORDS));
+        ULocale.ENGLISH.toLanguageTag(), createDictionaryRegex(RegExStrings.englishContextWords));
   }
 
   /**
@@ -318,7 +318,7 @@ public class OtpDetector {
      * A list of regular expressions representing words found in an OTP context (non case sensitive)
      * Note: TAN is short for Transaction Authentication Number
      */
-    private static final String[] ENGLISH_CONTEXT_WORDS =
+    private static final String[] englishContextWords =
             new String[] {
                     "pin",
                     "pass[-\\s]?(code|word)",
