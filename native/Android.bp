@@ -136,7 +136,12 @@ cc_defaults {
     ],
 
     static_libs: [
-        "libabsl",
+        "absl_strings",
+        "absl_container_flat_hash_map",
+        "absl_container_flat_hash_set",
+        "absl_container_node_hash_map",
+        "absl_numeric_int128",
+        "absl_random",
         "liblua",
         "libtflite_static",
         "libutf",
@@ -192,7 +197,12 @@ cc_library_static {
         "libtextclassifier_flatbuffer_headers",
     ],
     static_libs: [
-        "libabsl",
+        "absl_strings",
+        "absl_container_flat_hash_map",
+        "absl_container_flat_hash_set",
+        "absl_container_node_hash_map",
+        "absl_numeric_int128",
+        "absl_random",
         "tflite_support",
     ],
     sdk_version: "current",
