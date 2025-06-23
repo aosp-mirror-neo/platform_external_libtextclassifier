@@ -45,6 +45,7 @@ import androidx.annotation.GuardedBy;
 import androidx.annotation.WorkerThread;
 import androidx.collection.LruCache;
 import androidx.core.util.Pair;
+
 import com.android.textclassifier.common.ModelFile;
 import com.android.textclassifier.common.ModelType;
 import com.android.textclassifier.common.TextClassifierSettings;
@@ -299,6 +300,11 @@ final class TextClassifierImpl {
     if (TextClassifierUtils.isOtpClassificationEnabled() && entitiesToIdentify.contains(
             TextClassifierUtils.TYPE_OTP)) {
       TextClassifierOtpHandler.addOtpLink(request.getText().toString(), this, builder);
+    }
+
+    if (TextClassifierUtils.isAtLeastB() && com.android.internal.telephony.flags.Flags.redactOtpSmsApi() && entitiesToIdentify.contains(
+            TextClassifierUtils.TYPE_SMS_RETRIEVER_OTP)) {
+      TextClassifierSmsRetrieverHandler.addLink(request.getText().toString(), builder);
     }
 
     final String localesString = concatenateLocales(request.getDefaultLocales());
