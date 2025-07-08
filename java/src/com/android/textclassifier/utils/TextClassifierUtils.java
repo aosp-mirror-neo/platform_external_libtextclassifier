@@ -21,6 +21,7 @@ import android.view.textclassifier.TextClassifier;
 
 public class TextClassifierUtils {
     public static final String TYPE_OTP = getOtpType();
+    public static final String TYPE_SMS_RETRIEVER_OTP = getSmsRetrieverOtpType();
 
     private static String getOtpType() {
         if (!isAtLeastB() || !Flags.textClassifierChoiceApiEnabled()) {
@@ -29,7 +30,14 @@ public class TextClassifierUtils {
         return TextClassifier.TYPE_OTP;
     }
 
-    private static boolean isAtLeastB() {
+    private static String getSmsRetrieverOtpType() {
+        if (!isAtLeastB() || !com.android.internal.telephony.flags.Flags.redactOtpSmsApi()) {
+            return "sms_retriever_otp";
+        }
+        return TextClassifier.TYPE_SMS_RETRIEVER_OTP;
+    }
+
+    public static boolean isAtLeastB() {
         return Build.VERSION.CODENAME.equals("Baklava")
                 || Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA;
     }

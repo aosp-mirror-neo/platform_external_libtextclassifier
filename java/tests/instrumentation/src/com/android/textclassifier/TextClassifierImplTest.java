@@ -356,6 +356,26 @@ public class TextClassifierImplTest {
   }
 
   @Test
+  @RequiresFlagsEnabled(com.android.internal.telephony.flags.Flags.FLAG_REDACT_OTP_SMS_API)
+  public void testGenerateLinks_smsRetrieverOtp() throws IOException {
+    Assume.assumeTrue(TextClassifierUtils.isAtLeastB());
+    TextClassifierSmsRetrieverHandler.clearAllHashes();
+    TextClassifierSmsRetrieverHandler.addHash("VALIDHASH_1");
+    String text = "Your OTP code is 123456 VALIDHASH_1";
+
+    List<String> included = new ArrayList<>(List.of(TextClassifier.TYPE_SMS_RETRIEVER_OTP));
+    TextClassifier.EntityConfig config =
+            new TextClassifier.EntityConfig.Builder()
+                    .setIncludedTypes(included)
+                    .includeTypesFromTextClassifier(false)
+                    .build();
+    TextLinks.Request request = new TextLinks.Request.Builder(text).setEntityConfig(config).build();
+    assertThat(
+            classifier.generateLinks(null, null, request),
+            isTextLinksContaining(text, "", TextClassifier.TYPE_SMS_RETRIEVER_OTP));
+  }
+
+  @Test
   public void testGenerateLinks_exclude() throws IOException {
     String text = "The number is +12122537077. See you tonight!";
     List<String> hints = ImmutableList.of();
