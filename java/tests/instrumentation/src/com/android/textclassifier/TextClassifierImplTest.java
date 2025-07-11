@@ -36,6 +36,8 @@ import android.os.Bundle;
 import android.os.LocaleList;
 import android.permission.flags.Flags;
 import android.platform.test.annotations.RequiresFlagsEnabled;
+import android.platform.test.flag.junit.CheckFlagsRule;
+import android.platform.test.flag.junit.DeviceFlagsValueProvider;
 import android.text.Spannable;
 import android.text.SpannableString;
 import android.view.textclassifier.ConversationAction;
@@ -68,6 +70,7 @@ import org.hamcrest.Description;
 import org.hamcrest.Matcher;
 import org.junit.Assume;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
@@ -88,6 +91,10 @@ public class TextClassifierImplTest {
   private TextClassifierSettings settings;
   private LruCache<ModelFile, AnnotatorModel> annotatorModelCache;
   private TextClassifierImpl classifier;
+
+  @Rule
+  public final CheckFlagsRule mCheckFlagsRule =
+          DeviceFlagsValueProvider.createCheckFlagsRule();
 
   @Before
   public void setup() throws IOException {
