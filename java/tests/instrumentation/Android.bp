@@ -39,6 +39,7 @@ java_library {
         "androidx.test.espresso.core",
         "mockito-target-minus-junit4",
         "compatibility-device-util-axt",
+        "android.permission.flags-aconfig-java-export",
     ],
 }
 
