@@ -24,6 +24,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.res.AssetFileDescriptor;
 import android.icu.util.ULocale;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.LocaleList;
 import android.os.Looper;
@@ -302,9 +303,11 @@ final class TextClassifierImpl {
       TextClassifierOtpHandler.addOtpLink(request.getText().toString(), this, builder);
     }
 
-    if (TextClassifierUtils.isAtLeastB() && com.android.internal.telephony.flags.Flags.redactOtpSmsApi() && entitiesToIdentify.contains(
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA
+            && com.android.internal.telephony.flags.Flags.redactOtpSmsApi()
+            && entitiesToIdentify.contains(
             TextClassifierUtils.TYPE_SMS_RETRIEVER_OTP)) {
-      TextClassifierSmsRetrieverHandler.addLink(request.getText().toString(), builder);
+      TextClassifierSmsRetrieverHandler.addLink(request.getText().toString(), builder, context);
     }
 
     final String localesString = concatenateLocales(request.getDefaultLocales());

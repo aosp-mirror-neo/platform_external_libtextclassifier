@@ -15,13 +15,18 @@
  */
 package com.android.textclassifier;
 
+import static android.os.Build.VERSION_CODES.BAKLAVA;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-import android.platform.test.annotations.RequiresFlagsEnabled;
+import android.content.Context;
 import android.view.textclassifier.TextLinks;
 
+import androidx.test.filters.SdkSuppress;
+
+import com.android.textclassifier.testing.FakeContextBuilder;
 import com.android.textclassifier.utils.TextClassifierUtils;
 
 import org.junit.Assert;
@@ -34,17 +39,21 @@ import org.mockito.junit.MockitoJUnitRunner;
 import java.util.List;
 
 @RunWith(MockitoJUnitRunner.class)
-@RequiresFlagsEnabled(com.android.internal.telephony.flags.Flags.FLAG_REDACT_OTP_SMS_API)
+@SdkSuppress(minSdkVersion=BAKLAVA)
 public class TextClassifierSmsRetrieverHandlerTest {
     private static final String VALID_APP_HASH_1 = "VALIDHASH_1"; // 11 characters
     private static final String VALID_APP_HASH_2 = "VALIDHASH_2"; // 11 characters
     private static final String INVALID_APP_HASH = "INVALIDHASH"; // 11 characters
     private static final String MESSAGE_PREFIX = "Your OTP is: ";
 
+    private Context mContext;
+
     @Before
     public void setUp() {
         Assume.assumeTrue(TextClassifierUtils.isAtLeastB());
+        Assume.assumeTrue(com.android.internal.telephony.flags.Flags.redactOtpSmsApi());
         TextClassifierSmsRetrieverHandler.clearAllHashes();
+        mContext = new FakeContextBuilder().build();
     }
 
     @Test
@@ -53,7 +62,7 @@ public class TextClassifierSmsRetrieverHandlerTest {
         String message = MESSAGE_PREFIX + VALID_APP_HASH_1;
         TextLinks.Builder builder = new TextLinks.Builder(message);
 
-        TextClassifierSmsRetrieverHandler.addLink(message, builder);
+        TextClassifierSmsRetrieverHandler.addLink(message, builder, mContext);
         TextLinks textLinks = builder.build();
 
         Assert.assertNotNull("TextLinks object should not be null", textLinks);
@@ -72,7 +81,7 @@ public class TextClassifierSmsRetrieverHandlerTest {
         String message = MESSAGE_PREFIX + INVALID_APP_HASH;
         TextLinks.Builder builder = new TextLinks.Builder(message);
 
-        TextClassifierSmsRetrieverHandler.addLink(message, builder);
+        TextClassifierSmsRetrieverHandler.addLink(message, builder, mContext);
         TextLinks textLinks = builder.build();
 
         Assert.assertNotNull("TextLinks object should not be null", textLinks);

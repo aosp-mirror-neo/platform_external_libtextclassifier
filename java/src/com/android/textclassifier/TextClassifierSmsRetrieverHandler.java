@@ -15,11 +15,15 @@
  */
 package com.android.textclassifier;
 
+import android.content.Context;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.textclassifier.TextLinks;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.RequiresApi;
 
+import com.android.textclassifier.utils.AppHashHelper;
 import com.android.textclassifier.utils.TextClassifierUtils;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -35,15 +39,13 @@ import java.util.concurrent.ConcurrentHashMap;
  * This class checks if the input {@code text} contains a known 11-character app hash, if so, adds a
  * {@link TextLinks.Link} of type {@link android.view.textclassifier.TextClassifier#TYPE_SMS_RETRIEVER_OTP}.
  */
+@RequiresApi(Build.VERSION_CODES.BAKLAVA)
 public class TextClassifierSmsRetrieverHandler {
     private static final Set<String> SMS_RETRIEVER_APP_HASHES = ConcurrentHashMap.newKeySet();
     private static final int HASH_LENGTH = 11;
 
     /**
      * Adds a app hash to the set of known SMS Retriever hashes.
-     * <p>
-     * This method is called by the ExtServices module to populate the list of hashes that
-     * TextClassifier will use to identify SMS Retriever messages.
      *
      * @param hash The app hash to add.
      */
@@ -80,18 +82,25 @@ public class TextClassifierSmsRetrieverHandler {
     }
 
     /**
-     * Analyzes the given text and adds a link to the builder if it is identified as an
-     * SMS Retriever message.
+     * Analyzes the given text for an SMS Retriever app hash and, if found, adds a
+     * corresponding {@link TextLinks.Link} to the builder.
      * <p>
-     * This method checks if the input {@code text} contains a known 11-character app hash.
+     * This method first ensures that the list of known app hashes is loaded, which may involve
+     * a one-time scan of installed packages. It then searches the {@code text} for a known
+     * 11-character app hash.
+     * <p>
      * If a valid hash is found, a link spanning the entire message is added to the
      * {@code builder} with the entity type {@link TextClassifierUtils#TYPE_SMS_RETRIEVER_OTP}.
      *
      * @param text    The full content of the SMS message to be analyzed.
      * @param builder The {@link TextLinks.Builder} to which a new link will be added if the
      *                message is identified.
+     * @param context The {@link Context} used to access system services like
+     *                {@code PackageManager} for loading app hashes if they are not already cached.
      */
-    public static void addLink(@NonNull String text, @NonNull TextLinks.Builder builder) {
+    public static void addLink(@NonNull String text, @NonNull TextLinks.Builder builder,
+            @NonNull Context context) {
+        AppHashHelper.ensureLoaded(context);
         if (!containsSmsRetrieverHash(text)) {
             return;
         }
