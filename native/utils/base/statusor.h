@@ -17,6 +17,7 @@
 #ifndef LIBTEXTCLASSIFIER_UTILS_BASE_STATUSOR_H_
 #define LIBTEXTCLASSIFIER_UTILS_BASE_STATUSOR_H_
 
+#include <cstdlib>
 #include <type_traits>
 #include <utility>
 
