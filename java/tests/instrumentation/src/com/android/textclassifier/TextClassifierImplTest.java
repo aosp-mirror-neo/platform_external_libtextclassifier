@@ -52,6 +52,7 @@ import com.android.textclassifier.common.ModelType;
 import com.android.textclassifier.common.TextClassifierSettings;
 import com.android.textclassifier.testing.FakeContextBuilder;
 import com.android.textclassifier.testing.TestingDeviceConfig;
+import com.android.textclassifier.utils.AppHashHelper;
 import com.android.textclassifier.utils.TextClassifierUtils;
 
 import com.google.android.textclassifier.AnnotatorModel;
@@ -355,8 +356,9 @@ public class TextClassifierImplTest {
   public void testGenerateLinks_smsRetrieverOtp() throws IOException {
     Assume.assumeTrue(TextClassifierUtils.isAtLeastB());
     Assume.assumeTrue(com.android.internal.telephony.flags.Flags.redactOtpSmsApi());
-    TextClassifierSmsRetrieverHandler.clearAllHashes();
-    TextClassifierSmsRetrieverHandler.addHash("VALIDHASH_1");
+    AppHashHelper.clearAllHashes();
+    AppHashHelper.markAsLoadedFromPackageManagerForTest();
+    AppHashHelper.addHash("VALIDHASH_1");
     String text = "Your OTP code is 123456 VALIDHASH_1";
 
     List<String> included = new ArrayList<>(List.of(TextClassifier.TYPE_SMS_RETRIEVER_OTP));

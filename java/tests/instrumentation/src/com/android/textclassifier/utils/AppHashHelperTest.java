@@ -20,6 +20,8 @@ import static android.os.Build.VERSION_CODES.BAKLAVA;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -33,9 +35,10 @@ import android.content.pm.SigningInfo;
 
 import androidx.test.filters.SdkSuppress;
 
+import com.android.compatibility.common.util.SystemUtil;
 import com.android.modules.utils.build.SdkLevel;
-import com.android.textclassifier.TextClassifierSmsRetrieverHandler;
 
+import org.junit.After;
 import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Test;
@@ -43,11 +46,19 @@ import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 
 @RunWith(MockitoJUnitRunner.class)
-@SdkSuppress(minSdkVersion=BAKLAVA)
+@SdkSuppress(minSdkVersion = BAKLAVA)
 public class AppHashHelperTest {
     private static final String PACKAGE_NAME = "com.example.app";
     private static final String SIGNATURE_STRING = "mysignature";
@@ -62,8 +73,10 @@ public class AppHashHelperTest {
     @Mock
     private PackageManager mMockPackageManager;
 
+    private File mTempFile;
+
     @Before
-    public void setUp() {
+    public void setUp() throws IOException {
         Assume.assumeTrue(SdkLevel.isAtLeastB());
         Assume.assumeTrue(com.android.internal.telephony.flags.Flags.redactOtpSmsApi());
 
@@ -71,9 +84,21 @@ public class AppHashHelperTest {
         when(mMockSignature2.toCharsString()).thenReturn("another_signature");
         when(mMockContext.getPackageManager()).thenReturn(mMockPackageManager);
 
-        TextClassifierSmsRetrieverHandler.clearAllHashes();
-        AppHashHelper.sIsLoadComplete = false;
-        AppHashHelper.sLoadingFuture = null;
+        mTempFile = File.createTempFile("app_hashes", "txt");
+        when(mMockContext.openFileOutput(eq(AppHashHelper.APP_HASHES_FILENAME), anyInt()))
+                .thenReturn(new FileOutputStream(mTempFile));
+        when(mMockContext.openFileInput(eq(AppHashHelper.APP_HASHES_FILENAME)))
+                .thenThrow(new FileNotFoundException());
+
+        AppHashHelper.clearAllHashes();
+        AppHashHelper.resetLoadFromPackageManager();
+    }
+
+    @After
+    public void tearDown() {
+        if (mTempFile != null) {
+            mTempFile.delete();
+        }
     }
 
     @Test
@@ -125,7 +150,7 @@ public class AppHashHelperTest {
     }
 
     @Test
-    public void load_populatesCacheAndSkipsInvalidPackages() {
+    public void load_populatesCacheAndSkipsInvalidPackagesFromPackageManager() throws IOException {
         PackageInfo validPackage = createMockPackageInfo("com.example.app", true);
         validPackage.signingInfo = new SigningInfo(SigningInfo.VERSION_JAR,
                 Collections.singletonList(mMockSignature), null, null);
@@ -134,17 +159,27 @@ public class AppHashHelperTest {
 
         PackageInfo packageWithNullHash = createMockPackageInfo("com.nullhash.app", true);
         packageWithNullHash.signingInfo = new SigningInfo(SigningInfo.VERSION_JAR,
-                Collections.emptyList(), null, null); // Empty list leads to null hash
+                Collections.emptyList(), null, null);
 
         when(mMockPackageManager.getInstalledPackages(PackageManager.GET_SIGNING_CERTIFICATES))
                 .thenReturn(Arrays.asList(validPackage, packageWithoutCode, packageWithNullHash));
 
         AppHashHelper.ensureLoaded(mMockContext);
 
+        SystemUtil.eventually(() -> assertEquals("Load is expected to be completed", true,
+                AppHashHelper.isLoadedFromPackageManager()));
+
         assertEquals("Only one hash should be in the set.", 1,
-                TextClassifierSmsRetrieverHandler.getAppHashCount());
+                AppHashHelper.getAppHashes().size());
         assertTrue("The hash for the valid package should be added.",
-                TextClassifierSmsRetrieverHandler.hasHash(EXPECTED_HASH));
+                AppHashHelper.hasHash(EXPECTED_HASH));
+
+        List<String> lines = Files.readAllLines(mTempFile.toPath(), StandardCharsets.UTF_8);
+        assertEquals("The file should contain exactly one hash.", 1, lines.size());
+        assertEquals("The hash in the file should match the expected value.", EXPECTED_HASH,
+                lines.get(0));
+        verify(mMockContext).openFileOutput(eq(AppHashHelper.APP_HASHES_FILENAME),
+                eq(Context.MODE_PRIVATE));
     }
 
     @Test
@@ -157,6 +192,29 @@ public class AppHashHelperTest {
 
         verify(mMockPackageManager, times(1))
                 .getInstalledPackages(PackageManager.GET_SIGNING_CERTIFICATES);
+    }
+
+    @Test
+    public void load_loadsFromDisk() throws Exception {
+        String storedHashes = "hash1\nhash2\n";
+        Files.write(mTempFile.toPath(), storedHashes.getBytes(StandardCharsets.UTF_8));
+        when(mMockContext.openFileInput(eq(AppHashHelper.APP_HASHES_FILENAME))).thenReturn(
+                new FileInputStream(mTempFile));
+
+        // Prevent PackageManager from returning packages to ensure we're testing the disk cache.
+        // The PackageManager's results would otherwise overwrite the on-disk data.
+        when(mMockPackageManager.getInstalledPackages(PackageManager.GET_SIGNING_CERTIFICATES))
+                .thenReturn(Collections.emptyList());
+
+        AppHashHelper.ensureLoaded(mMockContext);
+
+        SystemUtil.eventually(() ->
+                assertEquals("Should contain 2 hashes loaded from disk", 2,
+                        AppHashHelper.getAppHashes().size())
+        );
+        assertTrue("Cache should contain hash1 from disk", AppHashHelper.hasHash("hash1"));
+        assertTrue("Cache should contain hash2 from disk", AppHashHelper.hasHash("hash2"));
+        verify(mMockPackageManager).getInstalledPackages(PackageManager.GET_SIGNING_CERTIFICATES);
     }
 
     private PackageInfo createMockPackageInfo(String packageName, boolean hasCode) {

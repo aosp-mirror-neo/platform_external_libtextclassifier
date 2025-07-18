@@ -30,8 +30,6 @@ import com.google.common.annotations.VisibleForTesting;
 
 import java.util.Collections;
 import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Handles messages that conform to the SMS Retriever API format.
@@ -41,52 +39,13 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @RequiresApi(Build.VERSION_CODES.BAKLAVA)
 public class TextClassifierSmsRetrieverHandler {
-    private static final Set<String> SMS_RETRIEVER_APP_HASHES = ConcurrentHashMap.newKeySet();
     private static final int HASH_LENGTH = 11;
-
-    /**
-     * Adds a app hash to the set of known SMS Retriever hashes.
-     *
-     * @param hash The app hash to add.
-     */
-    public static void addHash(String hash) {
-        SMS_RETRIEVER_APP_HASHES.add(hash);
-    }
-
-    /**
-     * Returns the number of app hashes currently cached.
-     *
-     * @return The total count of known app hashes.
-     */
-    public static int getAppHashCount() {
-        return SMS_RETRIEVER_APP_HASHES.size();
-    }
-
-    /**
-     * Clears all cached app hashes. For testing purposes only.
-     */
-    @VisibleForTesting
-    public static void clearAllHashes() {
-        SMS_RETRIEVER_APP_HASHES.clear();
-    }
-
-    /**
-     * Checks if a specific hash is present in the cache. For testing purposes only.
-     *
-     * @param hash The hash to check for.
-     * @return {@code true} if the hash is present, {@code false} otherwise.
-     */
-    @VisibleForTesting
-    public static boolean hasHash(String hash) {
-        return SMS_RETRIEVER_APP_HASHES.contains(hash);
-    }
 
     /**
      * Analyzes the given text for an SMS Retriever app hash and, if found, adds a
      * corresponding {@link TextLinks.Link} to the builder.
      * <p>
-     * This method first ensures that the list of known app hashes is loaded, which may involve
-     * a one-time scan of installed packages. It then searches the {@code text} for a known
+     * This method first invokes the app hashes load, then searches the {@code text} for a known
      * 11-character app hash.
      * <p>
      * If a valid hash is found, a link spanning the entire message is added to the
@@ -117,7 +76,7 @@ public class TextClassifierSmsRetrieverHandler {
 
         for (int i = text.length() - HASH_LENGTH; i >= 0; i--) {
             String sub = text.substring(i, i + HASH_LENGTH);
-            if (SMS_RETRIEVER_APP_HASHES.contains(sub)) {
+            if (AppHashHelper.hasHash(sub)) {
                 return true;
             }
         }
