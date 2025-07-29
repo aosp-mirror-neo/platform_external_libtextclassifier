@@ -16,8 +16,14 @@
 package com.android.textclassifier
 
 import android.content.Context
+import android.os.Build.VERSION_CODES.BAKLAVA
+import android.permission.flags.Flags
+import android.platform.test.annotations.RequiresFlagsEnabled
+import android.platform.test.flag.junit.CheckFlagsRule
+import android.platform.test.flag.junit.DeviceFlagsValueProvider
 import androidx.collection.LruCache
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.filters.SdkSuppress
 import com.android.textclassifier.common.ModelFile
 import com.android.textclassifier.common.ModelType
 import com.android.textclassifier.common.TextClassifierSettings
@@ -28,6 +34,7 @@ import com.google.android.textclassifier.AnnotatorModel
 import org.junit.Assert
 import org.junit.Assume
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.ArgumentMatchers
@@ -37,6 +44,10 @@ import org.mockito.Mockito
 import org.mockito.MockitoAnnotations
 
 @RunWith(AndroidJUnit4::class)
+@SdkSuppress(minSdkVersion = BAKLAVA)
+@RequiresFlagsEnabled(
+    Flags.FLAG_TEXT_CLASSIFIER_CHOICE_API_ENABLED, Flags.FLAG_ENABLE_OTP_IN_TEXT_CLASSIFIERS
+)
 class TextClassifierOtpHandlerTest {
     @Mock
     private lateinit var modelFileManager: ModelFileManager
@@ -47,10 +58,11 @@ class TextClassifierOtpHandlerTest {
     private lateinit var annotatorModelCache: LruCache<ModelFile, AnnotatorModel>
     private lateinit var tcImpl: TextClassifierImpl
 
+    @get:Rule
+    val mCheckFlagsRule: CheckFlagsRule = DeviceFlagsValueProvider.createCheckFlagsRule()
+
     @Before
     fun setup() {
-        Assume.assumeTrue(TextClassifierUtils.isOtpClassificationEnabled())
-
         MockitoAnnotations.initMocks(this)
         this.context =
             FakeContextBuilder()

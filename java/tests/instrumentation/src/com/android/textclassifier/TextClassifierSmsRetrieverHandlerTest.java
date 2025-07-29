@@ -22,6 +22,9 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import android.content.Context;
+import android.platform.test.annotations.RequiresFlagsEnabled;
+import android.platform.test.flag.junit.CheckFlagsRule;
+import android.platform.test.flag.junit.DeviceFlagsValueProvider;
 import android.view.textclassifier.TextLinks;
 
 import androidx.test.filters.SdkSuppress;
@@ -33,6 +36,7 @@ import com.android.textclassifier.utils.TextClassifierUtils;
 import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.junit.MockitoJUnitRunner;
@@ -40,7 +44,8 @@ import org.mockito.junit.MockitoJUnitRunner;
 import java.util.List;
 
 @RunWith(MockitoJUnitRunner.class)
-@SdkSuppress(minSdkVersion=BAKLAVA)
+@SdkSuppress(minSdkVersion = BAKLAVA)
+@RequiresFlagsEnabled(com.android.internal.telephony.flags.Flags.FLAG_REDACT_OTP_SMS_API)
 public class TextClassifierSmsRetrieverHandlerTest {
     private static final String VALID_APP_HASH_1 = "VALIDHASH_1"; // 11 characters
     private static final String VALID_APP_HASH_2 = "VALIDHASH_2"; // 11 characters
@@ -49,10 +54,11 @@ public class TextClassifierSmsRetrieverHandlerTest {
 
     private Context mContext;
 
+    @Rule
+    public final CheckFlagsRule mCheckFlagsRule = DeviceFlagsValueProvider.createCheckFlagsRule();
+
     @Before
     public void setUp() {
-        Assume.assumeTrue(TextClassifierUtils.isAtLeastB());
-        Assume.assumeTrue(com.android.internal.telephony.flags.Flags.redactOtpSmsApi());
         AppHashHelper.clearAllHashes();
         AppHashHelper.markAsLoadedFromPackageManagerForTest();
         mContext = new FakeContextBuilder().build();
