@@ -26,6 +26,7 @@ import android.util.Base64;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 import androidx.annotation.VisibleForTesting;
 
@@ -39,9 +40,9 @@ import java.nio.charset.Charset;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -54,12 +55,15 @@ import java.util.concurrent.TimeoutException;
 public class AppHashHelper {
     private static final String TAG = AppHashHelper.class.getSimpleName();
 
-    private static final Set<String> SMS_RETRIEVER_APP_HASHES = ConcurrentHashMap.newKeySet();
+    @VisibleForTesting
+    public static final Map<String, String> sAppHashCache = new ConcurrentHashMap<>();
 
     private static final Charset CHARSET_UTF_8 = Charset.forName("UTF-8");
     private static final String HASH_TYPE = "SHA-256";
     private static final int NUM_HASHED_BYTES = 9; // 9 bytes = 72 bits = 12 Base64s
     private static final int NUM_BASE64_CHARS = 11; // truncate 12 into 11 Base64 chars
+    @VisibleForTesting
+    public static final String HASH_DELIMITER = ",";
 
     @VisibleForTesting
     public static final String APP_HASHES_FILENAME = "app_hashes.txt";
@@ -71,30 +75,16 @@ public class AppHashHelper {
     private static volatile boolean sIsLoadedFromPackageManager = false;
 
     /**
-     * Checks if a specific hash is present in the cache.
+     * Returns the package name for a given hash.
      *
-     * @param hash The hash to check for.
-     * @return {@code true} if the hash is present, {@code false} otherwise.
+     * @param hash The hash to look up.
+     * @return The package name, or {@code null} if the hash is not found.
      */
-    public static boolean hasHash(String hash) {
+    @Nullable
+    public static String getPackageNameForHash(String hash) {
         synchronized (sLock) {
-            return SMS_RETRIEVER_APP_HASHES.contains(hash);
+            return sAppHashCache.get(hash);
         }
-    }
-
-    @VisibleForTesting
-    public static void addHash(String hash) {
-        SMS_RETRIEVER_APP_HASHES.add(hash);
-    }
-
-    @VisibleForTesting
-    public static void clearAllHashes() {
-        SMS_RETRIEVER_APP_HASHES.clear();
-    }
-
-    @VisibleForTesting
-    public static Set<String> getAppHashes() {
-        return SMS_RETRIEVER_APP_HASHES;
     }
 
     @VisibleForTesting
@@ -180,7 +170,7 @@ public class AppHashHelper {
             PackageManager packageManager = context.getPackageManager();
             List<PackageInfo> packages = packageManager.getInstalledPackages(
                     PackageManager.GET_SIGNING_CERTIFICATES);
-            Set<String> newHashes = new HashSet<>();
+            Map<String, String> hashToPackageMap = new HashMap<>();
             for (PackageInfo packageInfo : packages) {
                 // Skip packages that don't contain any executable code.
                 if (packageInfo.applicationInfo != null && (packageInfo.applicationInfo.flags
@@ -189,23 +179,21 @@ public class AppHashHelper {
                 }
                 String appHash = getAppHash(packageInfo.signingInfo, packageInfo.packageName);
                 if (appHash != null) {
-                    newHashes.add(appHash);
+                    hashToPackageMap.put(appHash, packageInfo.packageName);
                 }
             }
             // Early termination is for test purpose only, in real world the hashes will never be
             // empty.
-            if (newHashes.isEmpty()) {
+            if (hashToPackageMap.isEmpty()) {
                 return;
             }
             synchronized (sLock) {
-                clearAllHashes();
-                for (String hash : newHashes) {
-                    addHash(hash);
-                }
+                sAppHashCache.clear();
+                sAppHashCache.putAll(hashToPackageMap);
             }
             saveAppHashesToDisk(context);
             sIsLoadedFromPackageManager = true;
-            Log.i(TAG, "App hash codes refreshed, total found=" + getAppHashes().size());
+            Log.i(TAG, "App hash codes refreshed, total found=" + sAppHashCache.size());
         } finally {
             Trace.endSection();
         }
@@ -216,20 +204,21 @@ public class AppHashHelper {
             Trace.beginSection("loadAppHashesFromDisk");
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(
                     context.openFileInput(APP_HASHES_FILENAME), CHARSET_UTF_8))) {
-                Set<String> hashes = new HashSet<>();
+                Map<String, String> hashToPackageMap = new HashMap<>();
                 String line;
                 while ((line = reader.readLine()) != null) {
-                    hashes.add(line);
+                    String[] parts = line.split(HASH_DELIMITER, 2);
+                    if (parts.length == 2 && !parts[0].isEmpty() && !parts[1].isEmpty()) {
+                        hashToPackageMap.put(parts[0], parts[1]);
+                    }
                 }
-                if (hashes.isEmpty()) {
+                if (hashToPackageMap.isEmpty()) {
                     return;
                 }
                 synchronized (sLock) {
-                    for (String hash : hashes) {
-                        addHash(hash);
-                    }
+                    sAppHashCache.putAll(hashToPackageMap);
                 }
-                Log.i(TAG, "Loaded " + hashes.size() + " app hashes from disk");
+                Log.i(TAG, "Loaded " + hashToPackageMap.size() + " app hashes from disk");
             } catch (FileNotFoundException e) {
                 // This is expected if the file doesn't exist yet.
             } catch (IOException e) {
@@ -271,10 +260,10 @@ public class AppHashHelper {
             Log.w(TAG, "App hash is null for packageName=" + packageName);
             return;
         }
-        if (hasHash(appHash)) {
+        if (sAppHashCache.containsKey(appHash)) {
             return;
         }
-        addHash(appHash);
+        sAppHashCache.put(appHash, packageName);
         sExecutor.execute(() -> saveAppHashesToDisk(context));
     }
 
@@ -282,8 +271,8 @@ public class AppHashHelper {
         try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(
                 context.openFileOutput(APP_HASHES_FILENAME, Context.MODE_PRIVATE),
                 CHARSET_UTF_8))) {
-            for (String hash : getAppHashes()) {
-                writer.write(hash);
+            for (Map.Entry<String, String> entry : sAppHashCache.entrySet()) {
+                writer.write(entry.getKey() + HASH_DELIMITER + entry.getValue());
                 writer.newLine();
             }
         } catch (IOException e) {

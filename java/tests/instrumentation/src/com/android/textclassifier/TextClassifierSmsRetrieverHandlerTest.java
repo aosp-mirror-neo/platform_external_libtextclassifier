@@ -18,8 +18,8 @@ package com.android.textclassifier;
 import static android.os.Build.VERSION_CODES.BAKLAVA;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 
 import android.content.Context;
 import android.platform.test.annotations.RequiresFlagsEnabled;
@@ -34,7 +34,6 @@ import com.android.textclassifier.utils.AppHashHelper;
 import com.android.textclassifier.utils.TextClassifierUtils;
 
 import org.junit.Assert;
-import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -50,6 +49,8 @@ public class TextClassifierSmsRetrieverHandlerTest {
     private static final String VALID_APP_HASH_1 = "VALIDHASH_1"; // 11 characters
     private static final String VALID_APP_HASH_2 = "VALIDHASH_2"; // 11 characters
     private static final String INVALID_APP_HASH = "INVALIDHASH"; // 11 characters
+    private static final String TEST_APP_1 = "com.test.app.one";
+    private static final String TEST_APP_2 = "com.test.app.two";
     private static final String MESSAGE_PREFIX = "Your OTP is: ";
 
     private Context mContext;
@@ -59,14 +60,14 @@ public class TextClassifierSmsRetrieverHandlerTest {
 
     @Before
     public void setUp() {
-        AppHashHelper.clearAllHashes();
+        AppHashHelper.sAppHashCache.clear();
         AppHashHelper.markAsLoadedFromPackageManagerForTest();
         mContext = new FakeContextBuilder().build();
     }
 
     @Test
     public void addLink_validHash_addsLink() {
-        AppHashHelper.addHash(VALID_APP_HASH_1);
+        AppHashHelper.sAppHashCache.put(VALID_APP_HASH_1, TEST_APP_1);
         String message = MESSAGE_PREFIX + VALID_APP_HASH_1;
         TextLinks.Builder builder = new TextLinks.Builder(message);
 
@@ -81,11 +82,14 @@ public class TextClassifierSmsRetrieverHandlerTest {
         TextLinks.TextLink link = links.get(0);
         Assert.assertEquals("Exactly one entity should be added", 1, link.getEntityCount());
         assertEquals(TextClassifierUtils.TYPE_SMS_RETRIEVER_OTP, link.getEntity(0));
+
+        assertEquals(TEST_APP_1,
+                link.getExtras().getString(ExtrasUtils.EXTRA_SMS_RETRIEVER_HASH_MATCHED_PACKAGE));
     }
 
     @Test
     public void addLink_invalidHash_doesNotAddLink() {
-        AppHashHelper.addHash(VALID_APP_HASH_1);
+        AppHashHelper.sAppHashCache.put(VALID_APP_HASH_1, TEST_APP_1);
         String message = MESSAGE_PREFIX + INVALID_APP_HASH;
         TextLinks.Builder builder = new TextLinks.Builder(message);
 
@@ -100,73 +104,73 @@ public class TextClassifierSmsRetrieverHandlerTest {
 
     @Test
     public void containsSmsRetrieverHash_validHashAtEnd_returnsTrue() {
-        AppHashHelper.addHash(VALID_APP_HASH_1);
+        AppHashHelper.sAppHashCache.put(VALID_APP_HASH_1, TEST_APP_1);
         String text = "Your code is 123456" + VALID_APP_HASH_1;
 
-        assertTrue(TextClassifierSmsRetrieverHandler.containsSmsRetrieverHash(text));
+        assertNotNull(TextClassifierSmsRetrieverHandler.findSmsRetrieverPackageName(text));
     }
 
     @Test
     public void containsSmsRetrieverHash_validHashInMiddle_returnsTrue() {
-        AppHashHelper.addHash(VALID_APP_HASH_1);
+        AppHashHelper.sAppHashCache.put(VALID_APP_HASH_1, TEST_APP_1);
         String text = "Some text " + VALID_APP_HASH_1 + " more text";
 
-        assertTrue(TextClassifierSmsRetrieverHandler.containsSmsRetrieverHash(text));
+        assertNotNull(TextClassifierSmsRetrieverHandler.findSmsRetrieverPackageName(text));
     }
 
     @Test
     public void containsSmsRetrieverHash_validHashAtBeginning_returnsTrue() {
-        AppHashHelper.addHash(VALID_APP_HASH_1);
+        AppHashHelper.sAppHashCache.put(VALID_APP_HASH_1, TEST_APP_1);
         String text = VALID_APP_HASH_1 + " Your code is 123456";
 
-        assertTrue(TextClassifierSmsRetrieverHandler.containsSmsRetrieverHash(text));
+        assertNotNull(TextClassifierSmsRetrieverHandler.findSmsRetrieverPackageName(text));
     }
 
     @Test
     public void containsSmsRetrieverHash_multipleValidHashes_returnsTrue() {
-        AppHashHelper.addHash(VALID_APP_HASH_1);
-        AppHashHelper.addHash(VALID_APP_HASH_2);
+        AppHashHelper.sAppHashCache.put(VALID_APP_HASH_1, TEST_APP_1);
+        AppHashHelper.sAppHashCache.put(VALID_APP_HASH_2, TEST_APP_2);
         String text = "First hash: " + VALID_APP_HASH_1 + " Second hash: " + VALID_APP_HASH_2;
 
-        assertTrue(TextClassifierSmsRetrieverHandler.containsSmsRetrieverHash(text));
+        assertNotNull(TextClassifierSmsRetrieverHandler.findSmsRetrieverPackageName(text));
     }
 
     @Test
     public void containsSmsRetrieverHash_noMatchingHash_returnsFalse() {
-        AppHashHelper.addHash(VALID_APP_HASH_1);
+        AppHashHelper.sAppHashCache.put(VALID_APP_HASH_1, TEST_APP_1);
         String text = "This message does not contain a valid hash.";
 
-        assertFalse(TextClassifierSmsRetrieverHandler.containsSmsRetrieverHash(text));
+        assertNull(TextClassifierSmsRetrieverHandler.findSmsRetrieverPackageName(text));
     }
 
     @Test
     public void containsSmsRetrieverHash_textShorterThanHashLength_returnsFalse() {
-        AppHashHelper.addHash(VALID_APP_HASH_1);
+        AppHashHelper.sAppHashCache.put(VALID_APP_HASH_1, TEST_APP_1);
         String text = "Short"; // Length < HASH_LENGTH
 
-        assertFalse(TextClassifierSmsRetrieverHandler.containsSmsRetrieverHash(text));
+        assertNull(TextClassifierSmsRetrieverHandler.findSmsRetrieverPackageName(text));
     }
 
     @Test
     public void containsSmsRetrieverHash_textExactlyHashLength_matching_returnsTrue() {
-        AppHashHelper.addHash(VALID_APP_HASH_1);
+        AppHashHelper.sAppHashCache.put(VALID_APP_HASH_1, TEST_APP_1);
         String text = VALID_APP_HASH_1; // Exactly HASH_LENGTH
 
-        assertTrue(TextClassifierSmsRetrieverHandler.containsSmsRetrieverHash(text));
+        assertNotNull(TextClassifierSmsRetrieverHandler.findSmsRetrieverPackageName(text));
     }
 
     @Test
     public void containsSmsRetrieverHash_textExactlyHashLength_nonMatching_returnsFalse() {
-        AppHashHelper.addHash(VALID_APP_HASH_1);
+        AppHashHelper.sAppHashCache.put(VALID_APP_HASH_1, TEST_APP_1);
         String text = INVALID_APP_HASH; // Exactly HASH_LENGTH, but not in set
 
-        assertFalse(TextClassifierSmsRetrieverHandler.containsSmsRetrieverHash(text));
+        assertNull(TextClassifierSmsRetrieverHandler.findSmsRetrieverPackageName(text));
     }
 
     @Test
     public void containsSmsRetrieverHash_emptyHashCache_returnsFalse() {
         String text = MESSAGE_PREFIX + VALID_APP_HASH_1;
 
-        assertFalse(TextClassifierSmsRetrieverHandler.containsSmsRetrieverHash(text));
+        assertNull(TextClassifierSmsRetrieverHandler.findSmsRetrieverPackageName(text));
     }
 }
