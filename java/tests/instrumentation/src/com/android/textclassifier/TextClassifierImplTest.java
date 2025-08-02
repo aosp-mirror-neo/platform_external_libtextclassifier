@@ -32,8 +32,12 @@ import android.app.RemoteAction;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.LocaleList;
+import android.platform.test.annotations.RequiresFlagsEnabled;
+import android.platform.test.flag.junit.CheckFlagsRule;
+import android.platform.test.flag.junit.DeviceFlagsValueProvider;
 import android.text.Spannable;
 import android.text.SpannableString;
 import android.view.textclassifier.ConversationAction;
@@ -53,7 +57,6 @@ import com.android.textclassifier.common.TextClassifierSettings;
 import com.android.textclassifier.testing.FakeContextBuilder;
 import com.android.textclassifier.testing.TestingDeviceConfig;
 import com.android.textclassifier.utils.AppHashHelper;
-import com.android.textclassifier.utils.TextClassifierUtils;
 
 import com.google.android.textclassifier.AnnotatorModel;
 import com.google.common.collect.ImmutableList;
@@ -65,8 +68,8 @@ import java.util.List;
 import org.hamcrest.BaseMatcher;
 import org.hamcrest.Description;
 import org.hamcrest.Matcher;
-import org.junit.Assume;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
@@ -87,6 +90,9 @@ public class TextClassifierImplTest {
   private TextClassifierSettings settings;
   private LruCache<ModelFile, AnnotatorModel> annotatorModelCache;
   private TextClassifierImpl classifier;
+
+  @Rule
+  public final CheckFlagsRule mCheckFlagsRule = DeviceFlagsValueProvider.createCheckFlagsRule();
 
   @Before
   public void setup() throws IOException {
@@ -328,8 +334,10 @@ public class TextClassifierImplTest {
   }
 
   @Test
+  @SdkSuppress(minSdkVersion = Build.VERSION_CODES.BAKLAVA, codeName = "Baklava")
+  @RequiresFlagsEnabled({android.permission.flags.Flags.FLAG_TEXT_CLASSIFIER_CHOICE_API_ENABLED,
+          android.permission.flags.Flags.FLAG_ENABLE_OTP_IN_TEXT_CLASSIFIERS})
   public void testGenerateLinks_otp() throws IOException {
-    Assume.assumeTrue(TextClassifierUtils.isOtpClassificationEnabled());
     String text = "Your OTP code is 123456";
     List<String> included = new ArrayList<>(List.of(TextClassifier.TYPE_OTP));
     TextClassifier.EntityConfig config =
@@ -344,8 +352,10 @@ public class TextClassifierImplTest {
   }
 
   @Test
+  @SdkSuppress(minSdkVersion = Build.VERSION_CODES.BAKLAVA, codeName = "Baklava")
+  @RequiresFlagsEnabled({android.permission.flags.Flags.FLAG_TEXT_CLASSIFIER_CHOICE_API_ENABLED,
+          android.permission.flags.Flags.FLAG_ENABLE_OTP_IN_TEXT_CLASSIFIERS})
   public void testGenerateLinks_otpTypeNotInRequest() throws IOException {
-    Assume.assumeTrue(TextClassifierUtils.isOtpClassificationEnabled());
     String text = "Your OTP code is 123456";
     TextLinks.Request request = new TextLinks.Request.Builder(text).build();
     assertThat(
@@ -353,9 +363,9 @@ public class TextClassifierImplTest {
   }
 
   @Test
+  @SdkSuppress(minSdkVersion = Build.VERSION_CODES.BAKLAVA, codeName = "Baklava")
+  @RequiresFlagsEnabled(com.android.internal.telephony.flags.Flags.FLAG_REDACT_OTP_SMS_API)
   public void testGenerateLinks_smsRetrieverOtp() throws IOException {
-    Assume.assumeTrue(TextClassifierUtils.isAtLeastB());
-    Assume.assumeTrue(com.android.internal.telephony.flags.Flags.redactOtpSmsApi());
     AppHashHelper.clearAllHashes();
     AppHashHelper.markAsLoadedFromPackageManagerForTest();
     AppHashHelper.addHash("VALIDHASH_1");
