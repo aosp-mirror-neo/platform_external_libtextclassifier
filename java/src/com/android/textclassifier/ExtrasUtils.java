@@ -46,6 +46,13 @@ public final class ExtrasUtils {
   private static final String TEXT_LANGUAGES = "text-languages";
   private static final String ENTITIES = "entities";
 
+  // This constant mirrors the value of
+  // TextClassifier.EXTRA_SMS_RETRIEVER_HASH_MATCHED_PACKAGE. It should be replaced by the
+  // framework constant once it is made public.
+  @VisibleForTesting
+  public static final String EXTRA_SMS_RETRIEVER_HASH_MATCHED_PACKAGE =
+          "sms-retriever-hash-matched-package";
+
   // Keys for request objects.
   private static final String IS_SERIALIZED_ENTITY_DATA_ENABLED =
       "is-serialized-entity-data-enabled";
@@ -306,5 +313,15 @@ public final class ExtrasUtils {
   @VisibleForTesting
   public static void putIsSerializedEntityDataEnabled(Bundle bundle, boolean isEnabled) {
     bundle.putBoolean(IS_SERIALIZED_ENTITY_DATA_ENABLED, isEnabled);
+  }
+
+  /**
+   * Stores the package name of the app whose hash was found in the text.
+   *
+   * @param bundle The bundle to store the package name in.
+   * @param packageName The package name to store.
+   */
+  static void putAppHashMatchedPackageNameExtra(Bundle bundle, String packageName) {
+    bundle.putString(EXTRA_SMS_RETRIEVER_HASH_MATCHED_PACKAGE, packageName);
   }
 }

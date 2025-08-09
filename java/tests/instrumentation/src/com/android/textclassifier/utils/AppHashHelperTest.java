@@ -93,7 +93,7 @@ public class AppHashHelperTest {
         when(mMockContext.openFileInput(eq(AppHashHelper.APP_HASHES_FILENAME)))
                 .thenThrow(new FileNotFoundException());
 
-        AppHashHelper.clearAllHashes();
+        AppHashHelper.sAppHashCache.clear();
         AppHashHelper.resetLoadFromPackageManager();
     }
 
@@ -154,7 +154,8 @@ public class AppHashHelperTest {
 
     @Test
     public void load_populatesCacheAndSkipsInvalidPackagesFromPackageManager() throws IOException {
-        PackageInfo validPackage = createMockPackageInfo("com.example.app", true);
+        String testPackageName = "com.example.app";
+        PackageInfo validPackage = createMockPackageInfo(testPackageName, true);
         validPackage.signingInfo = new SigningInfo(SigningInfo.VERSION_JAR,
                 Collections.singletonList(mMockSignature), null, null);
 
@@ -173,13 +174,15 @@ public class AppHashHelperTest {
                 AppHashHelper.isLoadedFromPackageManager()));
 
         assertEquals("Only one hash should be in the set.", 1,
-                AppHashHelper.getAppHashes().size());
+                AppHashHelper.sAppHashCache.size());
         assertTrue("The hash for the valid package should be added.",
-                AppHashHelper.hasHash(EXPECTED_HASH));
+                AppHashHelper.sAppHashCache.containsKey(EXPECTED_HASH));
+        assertEquals(testPackageName, AppHashHelper.sAppHashCache.get(EXPECTED_HASH));
 
         List<String> lines = Files.readAllLines(mTempFile.toPath(), StandardCharsets.UTF_8);
+        String expectedLine = EXPECTED_HASH + AppHashHelper.HASH_DELIMITER + testPackageName;
         assertEquals("The file should contain exactly one hash.", 1, lines.size());
-        assertEquals("The hash in the file should match the expected value.", EXPECTED_HASH,
+        assertEquals("The hash in the file should match the expected value.", expectedLine,
                 lines.get(0));
         verify(mMockContext).openFileOutput(eq(AppHashHelper.APP_HASHES_FILENAME),
                 eq(Context.MODE_PRIVATE));
@@ -199,7 +202,13 @@ public class AppHashHelperTest {
 
     @Test
     public void load_loadsFromDisk() throws Exception {
-        String storedHashes = "hash1\nhash2\n";
+        String hash1 = "hash1";
+        String hash2 = "hash2";
+        String package1 = "com.test.app1";
+        String package2 = "com.test.app2";
+        String storedHashes = hash1 + AppHashHelper.HASH_DELIMITER + package1 + "\n" + hash2
+                + AppHashHelper.HASH_DELIMITER + package2 + "\n";
+
         Files.write(mTempFile.toPath(), storedHashes.getBytes(StandardCharsets.UTF_8));
         when(mMockContext.openFileInput(eq(AppHashHelper.APP_HASHES_FILENAME))).thenReturn(
                 new FileInputStream(mTempFile));
@@ -213,10 +222,14 @@ public class AppHashHelperTest {
 
         SystemUtil.eventually(() ->
                 assertEquals("Should contain 2 hashes loaded from disk", 2,
-                        AppHashHelper.getAppHashes().size())
+                        AppHashHelper.sAppHashCache.size())
         );
-        assertTrue("Cache should contain hash1 from disk", AppHashHelper.hasHash("hash1"));
-        assertTrue("Cache should contain hash2 from disk", AppHashHelper.hasHash("hash2"));
+        assertTrue("Cache should contain hash1 from disk",
+                AppHashHelper.sAppHashCache.containsKey(hash1));
+        assertTrue("Cache should contain hash2 from disk",
+                AppHashHelper.sAppHashCache.containsKey(hash2));
+        assertEquals(package1, AppHashHelper.sAppHashCache.get(hash1));
+        assertEquals(package2, AppHashHelper.sAppHashCache.get(hash2));
         verify(mMockPackageManager).getInstalledPackages(PackageManager.GET_SIGNING_CERTIFICATES);
     }
 

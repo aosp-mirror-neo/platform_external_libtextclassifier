@@ -21,6 +21,7 @@ import android.os.Bundle;
 import android.view.textclassifier.TextLinks;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 
 import com.android.textclassifier.utils.AppHashHelper;
@@ -50,6 +51,8 @@ public class TextClassifierSmsRetrieverHandler {
      * <p>
      * If a valid hash is found, a link spanning the entire message is added to the
      * {@code builder} with the entity type {@link TextClassifierUtils#TYPE_SMS_RETRIEVER_OTP}.
+     * The extras bundle of the link will contain the package name of the app to which hash has
+     * been matched, with the key {@link ExtrasUtils#EXTRA_APP_HASH_PACKAGE_NAME}.
      *
      * @param text    The full content of the SMS message to be analyzed.
      * @param builder The {@link TextLinks.Builder} to which a new link will be added if the
@@ -60,27 +63,30 @@ public class TextClassifierSmsRetrieverHandler {
     public static void addLink(@NonNull String text, @NonNull TextLinks.Builder builder,
             @NonNull Context context) {
         AppHashHelper.ensureLoaded(context);
-        if (!containsSmsRetrieverHash(text)) {
+        String packageName = findSmsRetrieverPackageName(text);
+        if (packageName == null) {
             return;
         }
         final Map<String, Float> entityScores = Collections.singletonMap(
                 TextClassifierUtils.TYPE_SMS_RETRIEVER_OTP, 1f);
-        builder.addLink(0, 0, entityScores, new Bundle());
+        Bundle extras = new Bundle();
+        ExtrasUtils.putAppHashMatchedPackageNameExtra(extras, packageName);
+        builder.addLink(0, 0, entityScores, extras);
     }
 
     @VisibleForTesting
-    public static boolean containsSmsRetrieverHash(@NonNull String text) {
+    @Nullable
+    public static String findSmsRetrieverPackageName(@NonNull String text) {
         if (text.length() < HASH_LENGTH) {
-            return false;
+            return null;
         }
-
         for (int i = text.length() - HASH_LENGTH; i >= 0; i--) {
             String sub = text.substring(i, i + HASH_LENGTH);
-            if (AppHashHelper.hasHash(sub)) {
-                return true;
+            String packageName = AppHashHelper.getPackageNameForHash(sub);
+            if (packageName != null) {
+                return packageName;
             }
         }
-
-        return false;
+        return null;
     }
 }

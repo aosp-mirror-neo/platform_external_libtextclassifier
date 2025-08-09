@@ -366,10 +366,12 @@ public class TextClassifierImplTest {
   @SdkSuppress(minSdkVersion = Build.VERSION_CODES.BAKLAVA, codeName = "Baklava")
   @RequiresFlagsEnabled(com.android.internal.telephony.flags.Flags.FLAG_REDACT_OTP_SMS_API)
   public void testGenerateLinks_smsRetrieverOtp() throws IOException {
-    AppHashHelper.clearAllHashes();
+    AppHashHelper.sAppHashCache.clear();
     AppHashHelper.markAsLoadedFromPackageManagerForTest();
-    AppHashHelper.addHash("VALIDHASH_1");
-    String text = "Your OTP code is 123456 VALIDHASH_1";
+    String testPackageName = "com.test.app";
+    String testHash = "VALIDHASH_1";
+    AppHashHelper.sAppHashCache.put(testHash, testPackageName);
+    String text = "Your OTP code is 123456 " + testHash;
 
     List<String> included = new ArrayList<>(List.of(TextClassifier.TYPE_SMS_RETRIEVER_OTP));
     TextClassifier.EntityConfig config =
@@ -378,9 +380,12 @@ public class TextClassifierImplTest {
                     .includeTypesFromTextClassifier(false)
                     .build();
     TextLinks.Request request = new TextLinks.Request.Builder(text).setEntityConfig(config).build();
+    TextLinks response = classifier.generateLinks(null, null, request);
     assertThat(
-            classifier.generateLinks(null, null, request),
+            response,
             isTextLinksContaining(text, "", TextClassifier.TYPE_SMS_RETRIEVER_OTP));
+    response.getLinks().forEach(link -> assertEquals(testPackageName,
+            link.getExtras().getString(ExtrasUtils.EXTRA_SMS_RETRIEVER_HASH_MATCHED_PACKAGE)));
   }
 
   @Test
