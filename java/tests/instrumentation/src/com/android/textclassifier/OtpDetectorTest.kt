@@ -77,52 +77,23 @@ class OtpDetectorTest {
     }
 
     @Test
-    fun testOtpDetection_validPinPatterns() {
-        val acceptedPinPatterns =
-            listOf(
-                // 3 to 8-digit numeric pin.
-                "Your OTP is 123",
-                "Your OTP is 1234",
-                "Your OTP is 12345",
-                "Your OTP is 123456",
-                "Your OTP is 1234567",
-                "Your OTP is 12345678",
-
-                // Numeric pin preceded by a letter tag.
-                "Your OTP is G-1234",
-                "Your OTP is G-123456",
-
-                // Numeric pin preceded by 3 to 5-letter tag.
-                "Your OTP is ABC-1234",
-                "Your OTP is ABC-123456",
-                "Your OTP is abcde-123456",
-
-                // 6-digit numeric pin with space in the middle.
-                "Your OTP is 123 456",
-
-                // 6 digits with dash in between.
-                "Your OTP is 1-2-3-4-5-6",
-                "Your OTP is 123-456",
-                "Your OTP is 12-3456",
-                "Your OTP is 12345-6",
-            )
-
-        for (otpMessage in acceptedPinPatterns) {
-            Assert.assertTrue(containsOtp(otpMessage));
-        }
-    }
-
-    @Test
     fun testContainsOtpLikePattern_length() {
-        val tooShortNumOnly = "12"
-        val minLenNumOnly = "123"
+        val tooShortAlphaNum = "123G"
+        val tooShortNumOnly = "123"
+        val minLenAlphaNum = "123G5"
+        val minLenNumOnly = "1235"
         val twoTriplets = "123 456"
         val tooShortTriplets = "12 345"
-        val maxLen = "12345678"
-        val tooLong = "123456789"
+        val maxLen = "123456F8"
+        val tooLong = "123T56789"
 
+        Assert.assertTrue(OtpDetector.containsOtpLikePattern(minLenAlphaNum))
         Assert.assertTrue(OtpDetector.containsOtpLikePattern(minLenNumOnly))
         Assert.assertTrue(OtpDetector.containsOtpLikePattern(maxLen))
+        Assert.assertFalse(
+            "$tooShortAlphaNum is too short",
+            OtpDetector.containsOtpLikePattern(tooShortAlphaNum)
+        )
         Assert.assertFalse(
             "$tooShortNumOnly is too short",
             OtpDetector.containsOtpLikePattern(tooShortNumOnly)
@@ -139,28 +110,36 @@ class OtpDetectorTest {
     }
 
     @Test
-    fun testContainsOtpLikePattern_rejectsNonRomanAlphabeticalChars() {
+    fun testContainsOtpLikePattern_acceptsNonRomanAlphabeticalChars() {
         val lowercase = "123ķ4"
         val uppercase = "123Ŀ4"
-        val ideographicInMiddle = "12码45"
+        val ideographicInMiddle = "123码456"
 
-        Assert.assertFalse(OtpDetector.containsOtpLikePattern(lowercase))
-        Assert.assertFalse(OtpDetector.containsOtpLikePattern(uppercase))
+        Assert.assertTrue(OtpDetector.containsOtpLikePattern(lowercase))
+        Assert.assertTrue(OtpDetector.containsOtpLikePattern(uppercase))
         Assert.assertFalse(OtpDetector.containsOtpLikePattern(ideographicInMiddle))
     }
 
     @Test
     fun testContainsOtpLikePattern_dashes() {
-        val oneDash = "1-23456"
-        val manyDashes = "1-23-456"
-        val consecutiveDashes = "1--2345"
+        val oneDash = "G-3d523"
+        val manyDashes = "G-FD-745"
+        val tooManyDashes = "6--7893"
         val oopsAllDashes = "------"
 
         Assert.assertTrue(OtpDetector.containsOtpLikePattern(oneDash))
         Assert.assertTrue(OtpDetector.containsOtpLikePattern(oneDash))
         Assert.assertTrue(OtpDetector.containsOtpLikePattern(manyDashes))
-        Assert.assertFalse(OtpDetector.containsOtpLikePattern(consecutiveDashes))
+        Assert.assertFalse(OtpDetector.containsOtpLikePattern(tooManyDashes))
         Assert.assertFalse(OtpDetector.containsOtpLikePattern(oopsAllDashes))
+    }
+
+    @Test
+    fun testContainsOtpLikePattern_lookaheadMustBeOtpChar() {
+        val validLookahead = "g4zy75"
+        val spaceLookahead = "GVRXY 2"
+        Assert.assertTrue(OtpDetector.containsOtpLikePattern(validLookahead))
+        Assert.assertFalse(OtpDetector.containsOtpLikePattern(spaceLookahead))
     }
 
     @Test
@@ -168,7 +147,7 @@ class OtpDetectorTest {
         val date = "01-01-2001"
         val singleDigitDate = "1-1-2001"
         val twoDigitYear = "1-1-01"
-        val dateWithOtpAfter = "1-1-01 is the date of your code 3425"
+        val dateWithOtpAfter = "1-1-01 is the date of your code T3425"
         val dateWithOtpBefore = "your code 54-234-3 was sent on 1-1-01"
         val otpWithDashesButInvalidDate = "34-58-30"
         val otpWithDashesButInvalidYear = "12-1-3089"
@@ -218,9 +197,6 @@ class OtpDetectorTest {
 
         // OTP: [01-01-2001] falsePositives=[01-01-2001] finalOtpCandidate=[]
         Assert.assertFalse(containsOtp("Your OTP code is null and this is sent on 01-01-2001"))
-
-        // OTP: ["ending with 1234"] falsePositives=["ending with 1234"] finalOtpCandidate=[]
-        Assert.assertFalse(containsOtp("Your transaction with credit card ending with 1234 is rejected."))
     }
 
     @Test
@@ -230,116 +206,43 @@ class OtpDetectorTest {
     }
 
     @Test
-    fun testContainsOtp_invalidStart() {
-        val invalidStarts =
-            listOf(
-                // No space at the start.
-                "Your OTP is123456",
-                "Your OTP ABC123456",
-
-                // Starting with a space that is preceded by a number.
-                "Your OTP is 4 123456",
-                "Your OTP is 123 123456",
-
-                // Starting with a colon that is preceded by a number.
-                "Your OTP is 4:123456",
-                "Your OTP is 123:123456",
-
-                // Starting with a dash that is preceded by a number.
-                "Your OTP is 4-12345678",
-                "Your OTP is 123-12345678",
-
-                // Starting with an unsupported symbol.
-                "Your OTP is $123456",
-                "Your OTP is %123456",
-                "Your OTP is ^123456",
-            )
-        for (invalidOtp in invalidStarts) {
-            Assert.assertFalse(containsOtp(invalidOtp))
-        }
-    }
-
-    @Test
-    fun testContainsOtp_invalidEnds() {
-        val invalidEnds =
-            listOf(
-                // No space at the end.
-                "Your OTP is 123456for real",
-                "Your OTP is 123456ABC",
-
-                // Ending with a space that is followed by a number.
-                "Your OTP is 123456 4",
-                "Your OTP is 123456 123456",
-
-                // Ending with a dash.
-                "Your OTP is 123456-",
-
-                // Ending with an underscore.
-                "Your OTP is 123456_",
-
-                // Ending with an unsupported symbol.
-                "Your OTP is 123456$",
-                "Your OTP is 123456%",
-                "Your OTP is 123456^",
-            )
-        for (invalidOtp in invalidEnds) {
-            Assert.assertFalse(containsOtp(invalidOtp))
-        }
-    }
-
-    @Test
-    fun testContainsOtp_validStartAndEnd() {
-        val validStartAndEnds =
-            listOf(
-                // Starting with colon preceded by a letter.
-                "Your OTP is:123456",
-
-                // Starting with a newline character.
-                "Your OTP is \n123456",
-                "Your OTP is\n123456",
-                "Your OTP is\n\n123456",
-
-                // Starting/ending with quote.
-                "Your OTP is '123456'",
-                "Your OTP is '123456",
-                "Your OTP is 123456'",
-
-                // Starting/ending with double quote.
-                "Your OTP is \"123456\"",
-                "Your OTP is \"123456",
-                "Your OTP is 123456\"",
-
-                // Starting/ending with square bracket.
-                "Your OTP is [123456]",
-                "Your OTP is [123456",
-                "Your OTP is 123456]",
-
-                // Starting/ending with ideographic character.
-                "Your OTP is码123456",
-                "Your OTP is 码123456",
-                "Your OTP is码345821码",
-                "Your OTP is 码345821码",
-                "Your OTP is 码 345821",
-                "Your OTP is 345821码",
-
-                // Ending with period.
-                "Your OTP is 123456.",
-
-                // Starting/ending with parens.
-                "Your OTP is (123456)",
-                "Your OTP is (123456",
-                "Your OTP is 123456)",
-
-                // Starting with a dash preceeded by a letter.
-                "Your OTP is XYZ-123456",
-                "Your OTP is G-123456",
-
-                // Starting with a closed square bracket.
-                "[Company]123456 is your OTP",
-            )
-        for (validOtp in validStartAndEnds) {
-            Assert.assertTrue(containsOtp(validOtp))
-        }
+    fun testContainsOtp_startAndEnd() {
+        val noSpaceStart = "your code isG-345821"
+        val noSpaceEnd = "your code is G-345821for real"
+        val numberSpaceStart = "your code is 4 G-345821"
+        val numberSpaceEnd = "your code is G-345821 3"
+        val colonStart = "your code is:G-345821"
+        val newLineStart = "your code is \nG-345821"
+        val quote = "your code is 'G-345821'"
+        val doubleQuote = "your code is \"G-345821\""
+        val bracketStart = "your code is [G-345821"
+        val ideographicStart = "your code is码G-345821"
+        val colonStartNumberPreceding = "your code is4:G-345821"
+        val periodEnd = "you code is G-345821."
+        val parens = "you code is (G-345821)"
+        val squareBrkt = "you code is [G-345821]"
+        val dashEnd = "you code is 'G-345821-'"
+        val randomSymbolEnd = "your code is G-345821$"
+        val underscoreEnd = "you code is 'G-345821_'"
+        val ideographicEnd = "your code is码G-345821码"
+        Assert.assertFalse(containsOtp(noSpaceStart))
+        Assert.assertFalse(containsOtp(noSpaceEnd))
+        Assert.assertFalse(containsOtp(numberSpaceStart))
+        Assert.assertFalse(containsOtp(numberSpaceEnd))
+        Assert.assertFalse(containsOtp(colonStartNumberPreceding))
+        Assert.assertFalse(containsOtp(dashEnd))
+        Assert.assertFalse(containsOtp(underscoreEnd))
+        Assert.assertFalse(containsOtp(randomSymbolEnd))
+        Assert.assertTrue(containsOtp(colonStart))
+        Assert.assertTrue(containsOtp(newLineStart))
+        Assert.assertTrue(containsOtp(quote))
+        Assert.assertTrue(containsOtp(doubleQuote))
+        Assert.assertTrue(containsOtp(bracketStart))
+        Assert.assertTrue(containsOtp(ideographicStart))
+        Assert.assertTrue(containsOtp(periodEnd))
+        Assert.assertTrue(containsOtp(parens))
+        Assert.assertTrue(containsOtp(squareBrkt))
+        Assert.assertTrue(containsOtp(ideographicEnd))
     }
 
     @Test
@@ -364,43 +267,6 @@ class OtpDetectorTest {
         Assert.assertTrue(containsOtp(multipleShortFpWithOtpAfter))
         Assert.assertTrue(containsOtp(multipleShortFpWithOtpBetween))
     }
-
-    @Test
-    fun testContainsOtp_withCodeKeyword_invalidContext() {
-        val invalidCodeKeywordContexts =
-            listOf(
-                // Code is followed by an alphanumeric token, e.g. voucher/promo code.
-                "Use code XMAS25 for a 15% off! Ref: 123456",
-                "Use code:XMAS25 for a 15% off! Ref: 123456",
-                "Use code: XMAS25 for a 15% off! Ref: 123456",
-                "Use code 50OFF for a 50% off! Ref: 123456",
-                "Use code: 50OFF for a 50% off! Ref: 123456",
-            )
-        for (invalidOtp in invalidCodeKeywordContexts) {
-            Assert.assertFalse(containsOtp(invalidOtp))
-        }
-    }
-
-    @Test
-    fun testContainsOtp_withCodeKeyword_validContext() {
-        val validCodeKeywordContexts =
-            listOf(
-                // Code that is not followed by an alphanumeric token.
-                "Use code 123456",
-                "Use code: 123456",
-                "Use code:123456",
-                "123456 is your code for the app",
-                "123456 is your code ABCDEF",
-                "123456 is your code:ABCDEF",
-                "123456 is your code: ABCDEF",
-                "123456 is your code",
-                "123456 is your code:",
-            )
-        for (validOtp in validCodeKeywordContexts) {
-            Assert.assertTrue(containsOtp(validOtp))
-        }
-    }
-
 
     @Test
     fun testContainsOtpCode_nonEnglish() {
