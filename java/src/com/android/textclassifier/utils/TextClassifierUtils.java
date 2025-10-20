@@ -31,7 +31,7 @@ public class TextClassifierUtils {
     }
 
     private static String getSmsRetrieverOtpType() {
-        if (!isAtLeastB() || !com.android.internal.telephony.flags.Flags.redactOtpSmsApi()) {
+        if (!isAtLeast25Q4() || !com.android.internal.telephony.flags.Flags.redactOtpSmsApi()) {
             return "sms_retriever_otp";
         }
         return TextClassifier.TYPE_SMS_RETRIEVER_OTP;
@@ -45,5 +45,11 @@ public class TextClassifierUtils {
     public static boolean isOtpClassificationEnabled() {
         return isAtLeastB() && Flags.textClassifierChoiceApiEnabled()
                 && Flags.enableOtpInTextClassifiers();
+    }
+
+    public static boolean isAtLeast25Q4() {
+        // Since SDK_INT_FULL doesn't exist until 36, we are ensuring v36 first
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA
+                && Build.VERSION.SDK_INT_FULL >= Build.VERSION_CODES_FULL.BAKLAVA_1;
     }
 }
