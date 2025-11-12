@@ -309,6 +309,12 @@ final class TextClassifierImpl {
       TextClassifierSmsRetrieverHandler.addLink(request.getText().toString(), builder, context);
     }
 
+    if (TextClassifierUtils.isAtLeast25Q4()
+            && android.view.flags.Flags.redactWebOtpSmsApi()
+            && entitiesToIdentify.contains(TextClassifierUtils.TYPE_SMS_WEB_OTP)) {
+      TextClassifierSmsWebOtpHandler.addLink(request.getText().toString(), builder, context);
+    }
+
     final String localesString = concatenateLocales(request.getDefaultLocales());
     LangIdModel langId = getLangIdImpl();
     ImmutableList<String> detectLanguageTags = detectLanguageTags(langId, request.getText());
