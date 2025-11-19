@@ -76,7 +76,6 @@ android_library {
         "auto_value_annotations",
         "androidx.room_room-runtime",
         "android.permission.flags-aconfig-java-export",
-        "android.view.flags-aconfig-java-export",
         "telephony_flags_core_java_exported_lib",
     ],
     sdk_version: "system_current",

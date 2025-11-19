@@ -22,7 +22,8 @@ import android.view.textclassifier.TextClassifier;
 public class TextClassifierUtils {
     public static final String TYPE_OTP = getOtpType();
     public static final String TYPE_SMS_RETRIEVER_OTP = getSmsRetrieverOtpType();
-    public static final String TYPE_SMS_WEB_OTP = getSmsWebOtpType();
+    // TODO(b/437043173): Use TextClassifier API instead.
+    public static final String TYPE_SMS_WEB_OTP = "sms_web_otp";
 
     private static String getOtpType() {
         if (!isAtLeastB() || !Flags.textClassifierChoiceApiEnabled()) {
@@ -36,13 +37,6 @@ public class TextClassifierUtils {
             return "sms_retriever_otp";
         }
         return TextClassifier.TYPE_SMS_RETRIEVER_OTP;
-    }
-
-    private static String getSmsWebOtpType() {
-        if (!android.view.flags.Flags.redactWebOtpSmsApi()) {
-            return "sms_web_otp";
-        }
-        return TextClassifier.TYPE_SMS_WEB_OTP;
     }
 
     public static boolean isAtLeastB() {
