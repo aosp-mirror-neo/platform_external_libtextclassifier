@@ -169,7 +169,8 @@ public class AppHashHelper {
             Trace.beginSection("refreshFromPackageManager");
             PackageManager packageManager = context.getPackageManager();
             List<PackageInfo> packages = packageManager.getInstalledPackages(
-                    PackageManager.GET_SIGNING_CERTIFICATES);
+                    PackageManager.GET_SIGNING_CERTIFICATES |
+                    PackageManager.MATCH_ANY_USER);
             Map<String, String> hashToPackageMap = new HashMap<>();
             for (PackageInfo packageInfo : packages) {
                 // Skip packages that don't contain any executable code.
@@ -246,7 +247,8 @@ public class AppHashHelper {
         try {
             packageInfo =
                     packageManager.getPackageInfo(packageName,
-                            PackageManager.GET_SIGNING_CERTIFICATES);
+                            PackageManager.GET_SIGNING_CERTIFICATES |
+                                    PackageManager.MATCH_ANY_USER);
         } catch (PackageManager.NameNotFoundException ignored) {
             return;
         }
