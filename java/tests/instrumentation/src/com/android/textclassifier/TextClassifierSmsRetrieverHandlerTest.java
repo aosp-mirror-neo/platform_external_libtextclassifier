@@ -33,6 +33,7 @@ import com.android.textclassifier.testing.FakeContextBuilder;
 import com.android.textclassifier.utils.AppHashHelper;
 import com.android.textclassifier.utils.TextClassifierUtils;
 
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -63,15 +64,22 @@ public class TextClassifierSmsRetrieverHandlerTest {
         AppHashHelper.sAppHashCache.clear();
         AppHashHelper.markAsLoadedFromPackageManagerForTest();
         mContext = new FakeContextBuilder().build();
+        TextClassifierSmsRetrieverHandler.bypassPackageVisibilityForTesting = true;
+    }
+
+    @After
+    public void tearDown() {
+        TextClassifierSmsRetrieverHandler.bypassPackageVisibilityForTesting = false;
     }
 
     @Test
     public void addLink_validHash_addsLink() {
         AppHashHelper.sAppHashCache.put(VALID_APP_HASH_1, TEST_APP_1);
         String message = MESSAGE_PREFIX + VALID_APP_HASH_1;
+        TextLinks.Request request = new TextLinks.Request.Builder(message).build();
         TextLinks.Builder builder = new TextLinks.Builder(message);
 
-        TextClassifierSmsRetrieverHandler.addLink(message, builder, mContext);
+        TextClassifierSmsRetrieverHandler.addLink(request, builder, mContext);
         TextLinks textLinks = builder.build();
 
         Assert.assertNotNull("TextLinks object should not be null", textLinks);
@@ -91,9 +99,10 @@ public class TextClassifierSmsRetrieverHandlerTest {
     public void addLink_invalidHash_doesNotAddLink() {
         AppHashHelper.sAppHashCache.put(VALID_APP_HASH_1, TEST_APP_1);
         String message = MESSAGE_PREFIX + INVALID_APP_HASH;
+        TextLinks.Request request = new TextLinks.Request.Builder(message).build();
         TextLinks.Builder builder = new TextLinks.Builder(message);
 
-        TextClassifierSmsRetrieverHandler.addLink(message, builder, mContext);
+        TextClassifierSmsRetrieverHandler.addLink(request, builder, mContext);
         TextLinks textLinks = builder.build();
 
         Assert.assertNotNull("TextLinks object should not be null", textLinks);
@@ -106,24 +115,30 @@ public class TextClassifierSmsRetrieverHandlerTest {
     public void containsSmsRetrieverHash_validHashAtEnd_returnsTrue() {
         AppHashHelper.sAppHashCache.put(VALID_APP_HASH_1, TEST_APP_1);
         String text = "Your code is 123456" + VALID_APP_HASH_1;
+        TextLinks.Request request = new TextLinks.Request.Builder(text).build();
 
-        assertNotNull(TextClassifierSmsRetrieverHandler.findSmsRetrieverPackageName(text));
+        assertNotNull(
+                TextClassifierSmsRetrieverHandler.findSmsRetrieverPackageName(mContext, request));
     }
 
     @Test
     public void containsSmsRetrieverHash_validHashInMiddle_returnsTrue() {
         AppHashHelper.sAppHashCache.put(VALID_APP_HASH_1, TEST_APP_1);
         String text = "Some text " + VALID_APP_HASH_1 + " more text";
+        TextLinks.Request request = new TextLinks.Request.Builder(text).build();
 
-        assertNotNull(TextClassifierSmsRetrieverHandler.findSmsRetrieverPackageName(text));
+        assertNotNull(
+                TextClassifierSmsRetrieverHandler.findSmsRetrieverPackageName(mContext, request));
     }
 
     @Test
     public void containsSmsRetrieverHash_validHashAtBeginning_returnsTrue() {
         AppHashHelper.sAppHashCache.put(VALID_APP_HASH_1, TEST_APP_1);
         String text = VALID_APP_HASH_1 + " Your code is 123456";
+        TextLinks.Request request = new TextLinks.Request.Builder(text).build();
 
-        assertNotNull(TextClassifierSmsRetrieverHandler.findSmsRetrieverPackageName(text));
+        assertNotNull(
+                TextClassifierSmsRetrieverHandler.findSmsRetrieverPackageName(mContext, request));
     }
 
     @Test
@@ -131,46 +146,58 @@ public class TextClassifierSmsRetrieverHandlerTest {
         AppHashHelper.sAppHashCache.put(VALID_APP_HASH_1, TEST_APP_1);
         AppHashHelper.sAppHashCache.put(VALID_APP_HASH_2, TEST_APP_2);
         String text = "First hash: " + VALID_APP_HASH_1 + " Second hash: " + VALID_APP_HASH_2;
+        TextLinks.Request request = new TextLinks.Request.Builder(text).build();
 
-        assertNotNull(TextClassifierSmsRetrieverHandler.findSmsRetrieverPackageName(text));
+        assertNotNull(
+                TextClassifierSmsRetrieverHandler.findSmsRetrieverPackageName(mContext, request));
     }
 
     @Test
     public void containsSmsRetrieverHash_noMatchingHash_returnsFalse() {
         AppHashHelper.sAppHashCache.put(VALID_APP_HASH_1, TEST_APP_1);
         String text = "This message does not contain a valid hash.";
+        TextLinks.Request request = new TextLinks.Request.Builder(text).build();
 
-        assertNull(TextClassifierSmsRetrieverHandler.findSmsRetrieverPackageName(text));
+        assertNull(
+                TextClassifierSmsRetrieverHandler.findSmsRetrieverPackageName(mContext, request));
     }
 
     @Test
     public void containsSmsRetrieverHash_textShorterThanHashLength_returnsFalse() {
         AppHashHelper.sAppHashCache.put(VALID_APP_HASH_1, TEST_APP_1);
         String text = "Short"; // Length < HASH_LENGTH
+        TextLinks.Request request = new TextLinks.Request.Builder(text).build();
 
-        assertNull(TextClassifierSmsRetrieverHandler.findSmsRetrieverPackageName(text));
+        assertNull(
+                TextClassifierSmsRetrieverHandler.findSmsRetrieverPackageName(mContext, request));
     }
 
     @Test
     public void containsSmsRetrieverHash_textExactlyHashLength_matching_returnsTrue() {
         AppHashHelper.sAppHashCache.put(VALID_APP_HASH_1, TEST_APP_1);
         String text = VALID_APP_HASH_1; // Exactly HASH_LENGTH
+        TextLinks.Request request = new TextLinks.Request.Builder(text).build();
 
-        assertNotNull(TextClassifierSmsRetrieverHandler.findSmsRetrieverPackageName(text));
+        assertNotNull(
+                TextClassifierSmsRetrieverHandler.findSmsRetrieverPackageName(mContext, request));
     }
 
     @Test
     public void containsSmsRetrieverHash_textExactlyHashLength_nonMatching_returnsFalse() {
         AppHashHelper.sAppHashCache.put(VALID_APP_HASH_1, TEST_APP_1);
         String text = INVALID_APP_HASH; // Exactly HASH_LENGTH, but not in set
+        TextLinks.Request request = new TextLinks.Request.Builder(text).build();
 
-        assertNull(TextClassifierSmsRetrieverHandler.findSmsRetrieverPackageName(text));
+        assertNull(
+                TextClassifierSmsRetrieverHandler.findSmsRetrieverPackageName(mContext, request));
     }
 
     @Test
     public void containsSmsRetrieverHash_emptyHashCache_returnsFalse() {
         String text = MESSAGE_PREFIX + VALID_APP_HASH_1;
+        TextLinks.Request request = new TextLinks.Request.Builder(text).build();
 
-        assertNull(TextClassifierSmsRetrieverHandler.findSmsRetrieverPackageName(text));
+        assertNull(
+                TextClassifierSmsRetrieverHandler.findSmsRetrieverPackageName(mContext, request));
     }
 }
