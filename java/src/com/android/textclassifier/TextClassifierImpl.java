@@ -306,7 +306,7 @@ final class TextClassifierImpl {
             && com.android.internal.telephony.flags.Flags.redactOtpSmsApi()
             && entitiesToIdentify.contains(
             TextClassifierUtils.TYPE_SMS_RETRIEVER_OTP)) {
-      TextClassifierSmsRetrieverHandler.addLink(request.getText().toString(), builder, context);
+      TextClassifierSmsRetrieverHandler.addLink(request, builder, context);
     }
 
     if (TextClassifierUtils.isAtLeast25Q4()
