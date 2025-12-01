@@ -372,6 +372,7 @@ public class TextClassifierImplTest {
     String testHash = "VALIDHASH_1";
     AppHashHelper.sAppHashCache.put(testHash, testPackageName);
     String text = "Your OTP code is 123456 " + testHash;
+    TextClassifierSmsRetrieverHandler.bypassPackageVisibilityForTesting = true;
 
     List<String> included = new ArrayList<>(List.of(TextClassifier.TYPE_SMS_RETRIEVER_OTP));
     TextClassifier.EntityConfig config =
@@ -386,6 +387,7 @@ public class TextClassifierImplTest {
             isTextLinksContaining(text, "", TextClassifier.TYPE_SMS_RETRIEVER_OTP));
     response.getLinks().forEach(link -> assertEquals(testPackageName,
             link.getExtras().getString(ExtrasUtils.EXTRA_SMS_RETRIEVER_HASH_MATCHED_PACKAGE)));
+    TextClassifierSmsRetrieverHandler.bypassPackageVisibilityForTesting = false;
   }
 
   @Test

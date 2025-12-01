@@ -165,7 +165,8 @@ public class AppHashHelperTest {
         packageWithNullHash.signingInfo = new SigningInfo(SigningInfo.VERSION_JAR,
                 Collections.emptyList(), null, null);
 
-        when(mMockPackageManager.getInstalledPackages(PackageManager.GET_SIGNING_CERTIFICATES))
+        when(mMockPackageManager.getInstalledPackages(
+                PackageManager.GET_SIGNING_CERTIFICATES | PackageManager.MATCH_ANY_USER))
                 .thenReturn(Arrays.asList(validPackage, packageWithoutCode, packageWithNullHash));
 
         AppHashHelper.ensureLoaded(mMockContext);
@@ -197,7 +198,8 @@ public class AppHashHelperTest {
         AppHashHelper.ensureLoaded(mMockContext); // Second call, should be skipped
 
         verify(mMockPackageManager, times(1))
-                .getInstalledPackages(PackageManager.GET_SIGNING_CERTIFICATES);
+                .getInstalledPackages(
+                        PackageManager.GET_SIGNING_CERTIFICATES | PackageManager.MATCH_ANY_USER);
     }
 
     @Test
@@ -230,7 +232,8 @@ public class AppHashHelperTest {
                 AppHashHelper.sAppHashCache.containsKey(hash2));
         assertEquals(package1, AppHashHelper.sAppHashCache.get(hash1));
         assertEquals(package2, AppHashHelper.sAppHashCache.get(hash2));
-        verify(mMockPackageManager).getInstalledPackages(PackageManager.GET_SIGNING_CERTIFICATES);
+        verify(mMockPackageManager).getInstalledPackages(
+                PackageManager.GET_SIGNING_CERTIFICATES | PackageManager.MATCH_ANY_USER);
     }
 
     private PackageInfo createMockPackageInfo(String packageName, boolean hasCode) {
