@@ -230,13 +230,13 @@ public class OtpDetector {
 
   private static class RegExStrings {
     /*
-     * A regex matching a line start, open paren, arrow, colon (not proceeded by a digit), open square
-     * bracket, equals sign, double or single quote, ideographic char, or a space that is not preceded
-     * by a number. It will not consume the start char (meaning START won't be included in the matched
-     * string)
+     * A regex matching a line start, open paren, arrow, colon (not proceeded by a digit), dash
+     * preceded by a letter, open/close square bracket, equals sign, double or single quote,
+     * ideographic char, or a space that is not preceded by a number.
+     * It will not consume the start char (meaning START won't be included in the matched string)
      */
     private static final String START =
-            "(^|(?<=((^|[^0-9])\\s)|[>(\"'=\\[\\p{IsIdeographic}]|[^0-9]:))";
+            "(^|(?<=((^|[^0-9])\\s)|[>\\](\"'=\\[\\p{IsIdeographic}]|[^0-9][:]|[A-Za-z]-))";
 
     /*
      * A regex matching a line end, a space that is not followed by a number, an ideographic char, or
@@ -248,44 +248,36 @@ public class OtpDetector {
     private static final String ALL_OTP;
 
     static {
-      /* One single OTP char. A number or alphabetical char (that isn't also ideographic) */
-      final String OTP_CHAR = "([0-9\\p{IsAlphabetic}&&[^\\p{IsIdeographic}]])";
+      /*
+       * One single OTP char. Currently, we only support numerical OTPs.
+       * We may support alphanumerical OTPs in the future.
+       */
+      final String OTP_CHAR = "\\d";
 
       /* One OTP char, followed by an optional dash */
       final String OTP_CHAR_WITH_DASH = format("(%s-?)", OTP_CHAR);
 
       /*
-       * Performs a lookahead to find a digit after 0 to 7 OTP_CHARs. This ensures that our potential
-       * OTP code contains at least one number
+       * Matches between 3 and 8 otp chars, with dashes in between. Here, we are assuming an OTP code is
+       * 3-8 characters long. The last char must not be followed by a dash
        */
-      final String FIND_DIGIT = format("(?=%s{0,7}\\d)", OTP_CHAR_WITH_DASH);
-
-      /*
-       * Matches between 5 and 8 otp chars, with dashes in between. Here, we are assuming an OTP code is
-       * 5-8 characters long. The last char must not be followed by a dash
-       */
-      final String OTP_CHARS = format("(%s{4,7}%s)", OTP_CHAR_WITH_DASH, OTP_CHAR);
-
-      /* A regex matching four digit numerical codes */
-      final String FOUR_DIGITS = "(\\d{4})";
-
-      final String FIVE_TO_EIGHT_ALPHANUM_AT_LEAST_ONE_NUM =
-              format("(%s%s)", FIND_DIGIT, OTP_CHARS);
+      final String THREE_TO_EIGHT_DIGITS_POTENTIALLY_WITH_DASH = format("(%s{2,7}%s)",
+                                                                        OTP_CHAR_WITH_DASH, OTP_CHAR);
 
       /* A regex matching two pairs of 3 digits (ex "123 456") */
       final String SIX_DIGITS_WITH_SPACE = "(\\d{3}\\s\\d{3})";
 
       /*
-       * Combining the regular expressions above, we get an OTP regex: 1. search for START, THEN 2.
-       * match ONE of a. alphanumeric sequence, at least one number, length 5-8, with optional dashes b.
-       * 4 numbers in a row c. pair of 3 digit codes separated by a space THEN 3. search for END Ex:
-       * "6454", " 345 678.", "[YDT-456]"
+       * Combining the regular expressions above, we get an OTP regex that does the following:
+       * 1. Search for START,
+       * 2. Match ONE of:
+       *    a. Numeric sequence of length 3-8 with optional dashes, or
+       *    b. Pair of 3 digit codes separated by a space,
+       * 3. Match END.
+       * Examples: "6454", " 345 678.", "[YDT-456]"
        */
-      ALL_OTP =
-              format(
-                      "%s(%s|%s|%s)%s",
-                      START, FIVE_TO_EIGHT_ALPHANUM_AT_LEAST_ONE_NUM, FOUR_DIGITS,
-                      SIX_DIGITS_WITH_SPACE, END);
+      ALL_OTP = format("%s(%s|%s)%s",
+                       START, THREE_TO_EIGHT_DIGITS_POTENTIALLY_WITH_DASH, SIX_DIGITS_WITH_SPACE, END);
     }
 
     private static final String FALSE_POSITIVE;
@@ -307,11 +299,19 @@ public class OtpDetector {
        */
       final String PHONE_WITH_SPACE = "(\\(?\\d{3}\\)?(-|\\s)?\\d{3}(-|\\s)?\\d{4})";
 
+
+      /*
+       * Matches informational last digits of identifiers (e.g. last 4 digits of credit card,
+       * bank account, etc).
+       */
+      final String LAST_DIGITS_OF_IDENTIFIER = "(ending(\\swith)?|card|id|number)\\s\\d{3,8}";
+
       /*
        * A combination of common false positives. These matches are expected to be longer than (or equal
        * in length to) otp matches.
        */
-      FALSE_POSITIVE = format("%s(%s|%s)%s", START, DATE_WITH_DASHES, PHONE_WITH_SPACE, END);
+      FALSE_POSITIVE = format("%s(%s|%s|%s)%s",
+                              START, DATE_WITH_DASHES, PHONE_WITH_SPACE, LAST_DIGITS_OF_IDENTIFIER, END);
     }
 
     /**
@@ -328,7 +328,9 @@ public class OtpDetector {
                     "(two|2)[-\\s]?factor",
                     "log[-\\s]?in",
                     "auth(enticat(e|ion))?",
-                    "code",
+                    // Match 'code' word that is not followed by alphanumerics, because they tend to
+                    // be vouchers or promo code (e.g., code 743a, or code:bzy6)
+                    "code(?!:?\\s?([a-zA-Z]{1,10}\\d|\\d{1,10}[a-zA-Z]))",
                     "secret",
                     "verif(y|ication)",
                     "one(\\s|-)?time",
