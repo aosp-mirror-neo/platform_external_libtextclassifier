@@ -23,6 +23,7 @@ import android.view.textclassifier.TextClassification;
 import android.view.textclassifier.TextClassifier;
 import android.view.textclassifier.TextLinks;
 import androidx.core.util.Pair;
+import com.android.textclassifier.utils.TextClassifierUtils;
 import com.google.android.textclassifier.AnnotatorModel;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
@@ -323,5 +324,9 @@ public final class ExtrasUtils {
    */
   static void putAppHashMatchedPackageNameExtra(Bundle bundle, String packageName) {
     bundle.putString(EXTRA_SMS_RETRIEVER_HASH_MATCHED_PACKAGE, packageName);
+  }
+
+  static void putOtpTrustedPackagesExtra(Bundle bundle, ArrayList<String> packageNames) {
+    bundle.putStringArrayList(TextClassifierUtils.EXTRA_OTP_TRUSTED_PACKAGES, packageNames);
   }
 }

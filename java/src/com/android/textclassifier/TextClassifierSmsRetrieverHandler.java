@@ -16,7 +16,6 @@
 package com.android.textclassifier;
 
 import android.content.Context;
-import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.textclassifier.TextLinks;
@@ -101,37 +100,12 @@ public class TextClassifierSmsRetrieverHandler {
         return null;
     }
 
-    /**
-     * Verifies if the calling package is allowed to see the target package.
-     *
-     * Performance: Highly efficient due to caching. The first execution may incur a one-time
-     * latency but all subsequent calls are instantaneous. Additionally, this is only invoked as a
-     * final validation step once package has been successfully identified.
-     */
     private static boolean hasPackageVisibility(Context context, String callingPackageName,
             String targetPackageName) {
         if (bypassPackageVisibilityForTesting) {
             return true;
         }
-        if (callingPackageName == null) {
-            return false;
-        }
-        PackageManager packageManager = context.getPackageManager();
-        boolean has_query_all_packages = packageManager.checkPermission(
-                android.Manifest.permission.QUERY_ALL_PACKAGES, callingPackageName)
-                == PackageManager.PERMISSION_GRANTED;
-        boolean has_interact_across_users = packageManager.checkPermission(
-                android.Manifest.permission.INTERACT_ACROSS_USERS, callingPackageName)
-                == PackageManager.PERMISSION_GRANTED;
-
-        if (has_query_all_packages && has_interact_across_users) {
-            return true;
-        } else {
-            try {
-                return packageManager.canPackageQuery(callingPackageName, targetPackageName);
-            } catch (PackageManager.NameNotFoundException ignored) {
-                return false;
-            }
-        }
+        return TextClassifierUtils.hasPackageVisibility(context, callingPackageName,
+            targetPackageName);
     }
 }

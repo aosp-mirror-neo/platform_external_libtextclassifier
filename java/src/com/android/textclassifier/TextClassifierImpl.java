@@ -312,7 +312,7 @@ final class TextClassifierImpl {
     if (TextClassifierUtils.isAtLeast25Q4()
             && android.view.flags.Flags.redactWebOtpSmsApi()
             && entitiesToIdentify.contains(TextClassifierUtils.TYPE_SMS_WEB_OTP)) {
-      TextClassifierSmsWebOtpHandler.addLink(request.getText().toString(), builder, context);
+      TextClassifierSmsWebOtpHandler.addLink(request, builder, context);
     }
 
     final String localesString = concatenateLocales(request.getDefaultLocales());
