@@ -24,8 +24,10 @@ import android.view.textclassifier.TextLanguage;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import com.google.common.collect.ImmutableList;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -102,7 +104,11 @@ public class OtpDetector {
     }
 
     TextLanguage language = getTextLanguage(text, tc);
-    return containsOtpWithLanguage(text, language);
+    ULocale uLocale = getLanguageWithRegex(language);
+    if (uLocale == null) {
+      return false;
+    }
+    return containsOtpWithLanguage(text, ImmutableList.of(uLocale.toLanguageTag()));
   }
 
   /**
@@ -116,18 +122,14 @@ public class OtpDetector {
    * from the determined locale.
    *
    * @param text The input text to scan for OTP keywords. Must not be null.
-   * @param language The language hint for the input text, used to determine the appropriate locale
+   * @param detectedLanguageTags The language tags for the input text
    * for keyword matching. Must not be null.
    * @return {@code true} if the text is determined to contain a language-specific OTP keyword
    * matching the language hint, {@code false} otherwise (including cases where the language
    * could not be confidently identified or no specific OTP keyword is found).
    */
-  protected static boolean containsOtpWithLanguage(@NonNull String text, @NonNull TextLanguage language) {
-    ULocale uLocale = getLanguageWithRegex(language);
-    if (uLocale == null) {
-      return false;
-    }
-    return hasLanguageSpecificOtpWord(text, uLocale.toLanguageTag());
+  protected static boolean containsOtpWithLanguage(@NonNull String text, @NonNull List<String> detectedLanguageTags) {
+    return hasLanguageSpecificOtpWord(text, detectedLanguageTags);
   }
 
   /**
@@ -176,20 +178,25 @@ public class OtpDetector {
    * This method uses regular expressions defined for specific languages to identify these words.
    *
    * @param text The text to check.
-   * @param languageTag The language tag (e.g., "en", "es", "fr") for which to check.
+   * @param detectedLanguageTags The language tag (e.g., "en", "es", "fr") for which to check.
    * @return {@code true} if the text contains a language-specific OTP word, {@code false} otherwise.
    *         Returns {@code false} if no language-specific regex is defined for the given tag.
    */
-  private static boolean hasLanguageSpecificOtpWord(@NonNull String text, @NonNull String languageTag) {
-    if (!EXTRA_LANG_OTP_REGEX.containsKey(languageTag)){
-      return false;
+  private static boolean hasLanguageSpecificOtpWord(@NonNull String text, @NonNull List<String> detectedLanguageTags) {
+    for (String languageTag : detectedLanguageTags) {
+      if (!EXTRA_LANG_OTP_REGEX.containsKey(languageTag)){
+        continue;
+      }
+      Matcher languageSpecificMatcher = EXTRA_LANG_OTP_REGEX.get(languageTag).get();
+      if (languageSpecificMatcher == null) {
+        continue;
+      }
+      languageSpecificMatcher.reset(text);
+      if (languageSpecificMatcher.find()) {
+        return true;
+      }
     }
-    Matcher languageSpecificMatcher = EXTRA_LANG_OTP_REGEX.get(languageTag).get();
-    if (languageSpecificMatcher == null) {
-      return false;
-    }
-    languageSpecificMatcher.reset(text);
-    return languageSpecificMatcher.find();
+    return false;
   }
 
   private static Set<String> getAllMatches(String text, Matcher regex) {

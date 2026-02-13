@@ -29,6 +29,7 @@ import com.google.common.annotations.VisibleForTesting;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -42,12 +43,13 @@ class TextClassifierOtpHandler {
    * Checks if the text might contain an OTP, if so, adds a link to the builder with type as OTP
    *
    * @param text    The text whose content should be checked for OTP
-   * @param tcImpl  Instance of the TextClassifierImpl to detect the language of input text
+   * @param detectedLanguageTags The language tags of the text.
    * @param builder TextLinks builder object to whom the OTP link to be added
    */
-  public static void addOtpLink(@NonNull String text, @NonNull TextClassifierImpl tcImpl,
-          @NonNull TextLinks.Builder builder) {
-    if (!containsOtp(text, tcImpl)) {
+  public static void addOtpLink(@NonNull String text,
+          @NonNull TextLinks.Builder builder,
+          @NonNull List<String> detectedLanguageTags) {
+    if (!containsOtp(text, detectedLanguageTags)) {
       return;
     }
     final Map<String, Float> entityScores = Collections.singletonMap(TextClassifierUtils.TYPE_OTP,
@@ -59,34 +61,21 @@ class TextClassifierOtpHandler {
    * Checks if a string of text might contain an OTP, based on several regular expressions, and
    * potentially using a textClassifier to eliminate false positives
    *
-   * @param text   The text whose content should be checked.
-   * @param tcImpl TextClassifierImpl to be used to find the language of the text.
+   * @param text                 The text whose content should be checked.
+   * @param detectedLanguageTags The language tags of the text.
    * @return {@code true} if an OTP is determined to be in the text, {@code false} otherwise.
    */
   @VisibleForTesting
   protected static boolean containsOtp(
           @NonNull String text,
-          @NonNull TextClassifierImpl tcImpl) {
+          @NonNull List<String> detectedLanguageTags) {
+    if (detectedLanguageTags.isEmpty()) {
+      return false;
+    }
     if (!OtpDetector.containsOtpLikePattern(text)) {
       return false;
     }
-
-    TextLanguage language = getTextLanguage(text, tcImpl);
-    if (language == null) {
-      return false;
-    }
-    return OtpDetector.containsOtpWithLanguage(text, language);
-  }
-
-  @Nullable
-  private static TextLanguage getTextLanguage(String text, @NonNull TextClassifierImpl tcImpl) {
-    TextLanguage.Request langRequest = new TextLanguage.Request.Builder(text).build();
-    try {
-      return tcImpl.detectLanguage(null, null, langRequest);
-    } catch (IOException e) {
-      TcLog.e(TAG, "Except detecting language", e);
-      return null;
-    }
+    return OtpDetector.containsOtpWithLanguage(text, detectedLanguageTags);
   }
 
   private TextClassifierOtpHandler() {}

@@ -56,7 +56,6 @@ class TextClassifierOtpHandlerTest {
     private lateinit var deviceConfig: TestingDeviceConfig
     private lateinit var settings: TextClassifierSettings
     private lateinit var annotatorModelCache: LruCache<ModelFile, AnnotatorModel>
-    private lateinit var tcImpl: TextClassifierImpl
 
     @get:Rule
     val mCheckFlagsRule: CheckFlagsRule = DeviceFlagsValueProvider.createCheckFlagsRule()
@@ -72,8 +71,6 @@ class TextClassifierOtpHandlerTest {
         this.deviceConfig = TestingDeviceConfig()
         this.settings = TextClassifierSettings(deviceConfig, /* isWear= */ false)
         this.annotatorModelCache = LruCache(2)
-        this.tcImpl =
-            TextClassifierImpl(context, settings, modelFileManager, annotatorModelCache)
 
         Mockito.`when`(
             modelFileManager.findBestModelFile(
@@ -104,7 +101,7 @@ class TextClassifierOtpHandlerTest {
     private fun containsOtp(text: String): Boolean {
         return TextClassifierOtpHandler.containsOtp(
             text,
-            this.tcImpl,
+            listOf("en"),
         )
     }
 
