@@ -38,6 +38,9 @@ import org.mockito.MockitoAnnotations
 
 @RunWith(AndroidJUnit4::class)
 class OtpDetectorTest {
+    private val englishLanguageTag = ULocale.ENGLISH.toLanguageTag()
+    private val englishLanguageTagList = listOf(englishLanguageTag)
+
     private lateinit var context: Context
     private lateinit var deviceConfig: TestingDeviceConfig
     private lateinit var settings: TextClassifierSettings
@@ -63,21 +66,14 @@ class OtpDetectorTest {
             .detectLanguage(any())
     }
 
-    private fun containsOtp(text: String): Boolean {
-        return OtpDetector.containsOtp(
-            text,
-            this.tc,
-        )
+    @Test
+    fun containsOtp_correctResult() {
+        Assert.assertFalse(OtpDetector.containsOtp("hello", this.tc))
+        Assert.assertTrue(OtpDetector.containsOtp("Your OTP code is 123456", this.tc))
     }
 
     @Test
-    fun testOtpDetection() {
-        Assert.assertFalse(containsOtp("hello"))
-        Assert.assertTrue(containsOtp("Your OTP code is 123456"))
-    }
-
-    @Test
-    fun testOtpDetection_validPinPatterns() {
+    fun containsOtp_english_validPinPatterns() {
         val acceptedPinPatterns =
             listOf(
                 // 3 to 8-digit numeric pin.
@@ -108,12 +104,13 @@ class OtpDetectorTest {
             )
 
         for (otpMessage in acceptedPinPatterns) {
-            Assert.assertTrue(containsOtp(otpMessage));
+            Assert.assertTrue(OtpDetector.containsOtp(otpMessage, this.tc));
+            Assert.assertTrue(OtpDetector.containsOtp(otpMessage, englishLanguageTagList));
         }
     }
 
     @Test
-    fun testContainsOtpLikePattern_length() {
+    fun containsOtpLikePattern_english_length() {
         val tooShortNumOnly = "12"
         val minLenNumOnly = "123"
         val twoTriplets = "123 456"
@@ -121,50 +118,50 @@ class OtpDetectorTest {
         val maxLen = "12345678"
         val tooLong = "123456789"
 
-        Assert.assertTrue(OtpDetector.containsOtpLikePattern(minLenNumOnly))
-        Assert.assertTrue(OtpDetector.containsOtpLikePattern(maxLen))
+        Assert.assertTrue(OtpDetector.containsOtpLikePattern(minLenNumOnly, englishLanguageTag))
+        Assert.assertTrue(OtpDetector.containsOtpLikePattern(maxLen, englishLanguageTag))
         Assert.assertFalse(
             "$tooShortNumOnly is too short",
-            OtpDetector.containsOtpLikePattern(tooShortNumOnly)
+            OtpDetector.containsOtpLikePattern(tooShortNumOnly, englishLanguageTag)
         )
         Assert.assertFalse(
             "$tooLong is too long",
-            OtpDetector.containsOtpLikePattern(tooLong)
+            OtpDetector.containsOtpLikePattern(tooLong, englishLanguageTag)
         )
-        Assert.assertTrue(OtpDetector.containsOtpLikePattern(twoTriplets))
+        Assert.assertTrue(OtpDetector.containsOtpLikePattern(twoTriplets, englishLanguageTag))
         Assert.assertFalse(
             "$tooShortTriplets is too short",
-            OtpDetector.containsOtpLikePattern(tooShortTriplets)
+            OtpDetector.containsOtpLikePattern(tooShortTriplets, englishLanguageTag)
         )
     }
 
     @Test
-    fun testContainsOtpLikePattern_rejectsNonRomanAlphabeticalChars() {
+    fun containsOtpLikePattern_english_rejectsNonRomanAlphabeticalChars() {
         val lowercase = "123ķ4"
         val uppercase = "123Ŀ4"
         val ideographicInMiddle = "12码45"
 
-        Assert.assertFalse(OtpDetector.containsOtpLikePattern(lowercase))
-        Assert.assertFalse(OtpDetector.containsOtpLikePattern(uppercase))
-        Assert.assertFalse(OtpDetector.containsOtpLikePattern(ideographicInMiddle))
+        Assert.assertFalse(OtpDetector.containsOtpLikePattern(lowercase, englishLanguageTag))
+        Assert.assertFalse(OtpDetector.containsOtpLikePattern(uppercase, englishLanguageTag))
+        Assert.assertFalse(OtpDetector.containsOtpLikePattern(ideographicInMiddle, englishLanguageTag))
     }
 
     @Test
-    fun testContainsOtpLikePattern_dashes() {
+    fun containsOtpLikePattern_english_dashes() {
         val oneDash = "1-23456"
         val manyDashes = "1-23-456"
         val consecutiveDashes = "1--2345"
         val oopsAllDashes = "------"
 
-        Assert.assertTrue(OtpDetector.containsOtpLikePattern(oneDash))
-        Assert.assertTrue(OtpDetector.containsOtpLikePattern(oneDash))
-        Assert.assertTrue(OtpDetector.containsOtpLikePattern(manyDashes))
-        Assert.assertFalse(OtpDetector.containsOtpLikePattern(consecutiveDashes))
-        Assert.assertFalse(OtpDetector.containsOtpLikePattern(oopsAllDashes))
+        Assert.assertTrue(OtpDetector.containsOtpLikePattern(oneDash, englishLanguageTag))
+        Assert.assertTrue(OtpDetector.containsOtpLikePattern(oneDash, englishLanguageTag))
+        Assert.assertTrue(OtpDetector.containsOtpLikePattern(manyDashes, englishLanguageTag))
+        Assert.assertFalse(OtpDetector.containsOtpLikePattern(consecutiveDashes, englishLanguageTag))
+        Assert.assertFalse(OtpDetector.containsOtpLikePattern(oopsAllDashes, englishLanguageTag))
     }
 
     @Test
-    fun testContainsOtpLikePattern_dateExclusion() {
+    fun containsOtpLikePattern_english_dateExclusion() {
         val date = "01-01-2001"
         val singleDigitDate = "1-1-2001"
         val twoDigitYear = "1-1-01"
@@ -173,64 +170,64 @@ class OtpDetectorTest {
         val otpWithDashesButInvalidDate = "34-58-30"
         val otpWithDashesButInvalidYear = "12-1-3089"
 
-        Assert.assertFalse(OtpDetector.containsOtpLikePattern(date))
-        Assert.assertFalse(OtpDetector.containsOtpLikePattern(singleDigitDate))
-        Assert.assertFalse(OtpDetector.containsOtpLikePattern(twoDigitYear))
+        Assert.assertFalse(OtpDetector.containsOtpLikePattern(date, englishLanguageTag))
+        Assert.assertFalse(OtpDetector.containsOtpLikePattern(singleDigitDate, englishLanguageTag))
+        Assert.assertFalse(OtpDetector.containsOtpLikePattern(twoDigitYear, englishLanguageTag))
 
-        Assert.assertTrue(OtpDetector.containsOtpLikePattern(dateWithOtpAfter))
-        Assert.assertTrue(OtpDetector.containsOtpLikePattern(dateWithOtpBefore))
+        Assert.assertTrue(OtpDetector.containsOtpLikePattern(dateWithOtpAfter, englishLanguageTag))
+        Assert.assertTrue(OtpDetector.containsOtpLikePattern(dateWithOtpBefore, englishLanguageTag))
         Assert.assertTrue(
-            OtpDetector.containsOtpLikePattern(otpWithDashesButInvalidDate)
+            OtpDetector.containsOtpLikePattern(otpWithDashesButInvalidDate, englishLanguageTag)
         )
         Assert.assertTrue(
-            OtpDetector.containsOtpLikePattern(otpWithDashesButInvalidYear)
+            OtpDetector.containsOtpLikePattern(otpWithDashesButInvalidYear, englishLanguageTag)
         )
     }
 
     @Test
-    fun testContainsOtpLikePattern_phoneExclusion() {
+    fun containsOtpLikePattern_english_phoneExclusion() {
         val parens = "(888) 8888888"
         val allSpaces = "888 888 8888"
         val withDash = "(888) 888-8888"
         val allDashes = "888-888-8888"
         val allDashesWithParen = "(888)-888-8888"
 
-        Assert.assertFalse(OtpDetector.containsOtpLikePattern(parens))
-        Assert.assertFalse(OtpDetector.containsOtpLikePattern(allSpaces))
-        Assert.assertFalse(OtpDetector.containsOtpLikePattern(withDash))
-        Assert.assertFalse(OtpDetector.containsOtpLikePattern(allDashes))
-        Assert.assertFalse(OtpDetector.containsOtpLikePattern(allDashesWithParen))
+        Assert.assertFalse(OtpDetector.containsOtpLikePattern(parens, englishLanguageTag))
+        Assert.assertFalse(OtpDetector.containsOtpLikePattern(allSpaces, englishLanguageTag))
+        Assert.assertFalse(OtpDetector.containsOtpLikePattern(withDash, englishLanguageTag))
+        Assert.assertFalse(OtpDetector.containsOtpLikePattern(allDashes, englishLanguageTag))
+        Assert.assertFalse(OtpDetector.containsOtpLikePattern(allDashesWithParen, englishLanguageTag))
     }
 
     @Test
-    fun testContainsOtp_falsePositiveExclusion() {
+    fun containsOtpLikePattern_english_falsePositiveExclusion() {
         // OTP: [888-8888] falsePositives=[] finalOtpCandidate=[1234]
-        Assert.assertTrue(containsOtp("Your OTP is 888-8888"))
+        Assert.assertTrue(OtpDetector.containsOtp("Your OTP is 888-8888", englishLanguageTagList))
 
         // OTP: [1234, 888-8888] falsePositives=[(888) 888-8888] finalOtpCandidate=[1234]
-        Assert.assertTrue(containsOtp("1234 is your OTP, call (888) 888-8888 for more info"))
+        Assert.assertTrue(OtpDetector.containsOtp("1234 is your OTP, call (888) 888-8888 for more info", englishLanguageTagList))
 
         // OTP: [888-8888] falsePositives=[(888) 888-8888] finalOtpCandidate=[]
-        Assert.assertFalse(containsOtp("Your OTP can't be shared at this point, please call (888) 888-8888"))
+        Assert.assertFalse(OtpDetector.containsOtp("Your OTP can't be shared at this point, please call (888) 888-8888", englishLanguageTagList))
 
         // OTP: [1234, 01-01-2001] falsePositives=[01-01-2001] finalOtpCandidate=[1234]
-        Assert.assertTrue(containsOtp("Your OTP code is 1234 and this is sent on 01-01-2001"))
+        Assert.assertTrue(OtpDetector.containsOtp("Your OTP code is 1234 and this is sent on 01-01-2001", englishLanguageTagList))
 
         // OTP: [01-01-2001] falsePositives=[01-01-2001] finalOtpCandidate=[]
-        Assert.assertFalse(containsOtp("Your OTP code is null and this is sent on 01-01-2001"))
+        Assert.assertFalse(OtpDetector.containsOtp("Your OTP code is null and this is sent on 01-01-2001", englishLanguageTagList))
 
         // OTP: ["ending with 1234"] falsePositives=["ending with 1234"] finalOtpCandidate=[]
-        Assert.assertFalse(containsOtp("Your transaction with credit card ending with 1234 is rejected."))
+        Assert.assertFalse(OtpDetector.containsOtp("Your transaction with credit card ending with 1234 is rejected.", englishLanguageTagList))
     }
 
     @Test
-    fun testContainsOtp_mustHaveNumber() {
+    fun containsOtp_english_mustHaveNumber() {
         val noNums = "TEFHXES"
-        Assert.assertFalse(containsOtp(noNums))
+        Assert.assertFalse(OtpDetector.containsOtp(noNums, englishLanguageTagList))
     }
 
     @Test
-    fun testContainsOtp_invalidStart() {
+    fun containsOtp_english_invalidStart() {
         val invalidStarts =
             listOf(
                 // No space at the start.
@@ -255,12 +252,12 @@ class OtpDetectorTest {
                 "Your OTP is ^123456",
             )
         for (invalidOtp in invalidStarts) {
-            Assert.assertFalse(containsOtp(invalidOtp))
+            Assert.assertFalse(OtpDetector.containsOtp(invalidOtp, englishLanguageTagList))
         }
     }
 
     @Test
-    fun testContainsOtp_invalidEnds() {
+    fun containsOtp_english_invalidEnds() {
         val invalidEnds =
             listOf(
                 // No space at the end.
@@ -283,12 +280,12 @@ class OtpDetectorTest {
                 "Your OTP is 123456^",
             )
         for (invalidOtp in invalidEnds) {
-            Assert.assertFalse(containsOtp(invalidOtp))
+            Assert.assertFalse(OtpDetector.containsOtp(invalidOtp, englishLanguageTagList))
         }
     }
 
     @Test
-    fun testContainsOtp_validStartAndEnd() {
+    fun containsOtp_english_validStartAndEnd() {
         val validStartAndEnds =
             listOf(
                 // Starting with colon preceded by a letter.
@@ -338,12 +335,12 @@ class OtpDetectorTest {
                 "[Company]123456 is your OTP",
             )
         for (validOtp in validStartAndEnds) {
-            Assert.assertTrue(containsOtp(validOtp))
+            Assert.assertTrue(OtpDetector.containsOtp(validOtp, englishLanguageTagList))
         }
     }
 
     @Test
-    fun testContainsOtp_multipleFalsePositives() {
+    fun containsOtp_english_multipleFalsePositives() {
         val otp = "code 1543 code"
         val longFp = "888-777-6666"
         val shortFp = "34ess"
@@ -355,18 +352,18 @@ class OtpDetectorTest {
         val multipleShortFpWithOtpBefore = "$otp $multipleShortFp"
         val multipleShortFpWithOtpAfter = "$otp $multipleShortFp"
         val multipleShortFpWithOtpBetween = "$shortFp $otp $shortFp"
-        Assert.assertFalse(containsOtp(multipleLongFp))
-        Assert.assertFalse(containsOtp(multipleShortFp))
-        Assert.assertTrue(containsOtp(multipleLongFpWithOtpBefore))
-        Assert.assertTrue(containsOtp(multipleLongFpWithOtpAfter))
-        Assert.assertTrue(containsOtp(multipleLongFpWithOtpBetween))
-        Assert.assertTrue(containsOtp(multipleShortFpWithOtpBefore))
-        Assert.assertTrue(containsOtp(multipleShortFpWithOtpAfter))
-        Assert.assertTrue(containsOtp(multipleShortFpWithOtpBetween))
+        Assert.assertFalse(OtpDetector.containsOtp(multipleLongFp, englishLanguageTagList))
+        Assert.assertFalse(OtpDetector.containsOtp(multipleShortFp, englishLanguageTagList))
+        Assert.assertTrue(OtpDetector.containsOtp(multipleLongFpWithOtpBefore, englishLanguageTagList))
+        Assert.assertTrue(OtpDetector.containsOtp(multipleLongFpWithOtpAfter, englishLanguageTagList))
+        Assert.assertTrue(OtpDetector.containsOtp(multipleLongFpWithOtpBetween, englishLanguageTagList))
+        Assert.assertTrue(OtpDetector.containsOtp(multipleShortFpWithOtpBefore, englishLanguageTagList))
+        Assert.assertTrue(OtpDetector.containsOtp(multipleShortFpWithOtpAfter, englishLanguageTagList))
+        Assert.assertTrue(OtpDetector.containsOtp(multipleShortFpWithOtpBetween, englishLanguageTagList))
     }
 
     @Test
-    fun testContainsOtp_withCodeKeyword_invalidContext() {
+    fun containsOtp_english_withCodeKeyword_invalidContext() {
         val invalidCodeKeywordContexts =
             listOf(
                 // Code is followed by an alphanumeric token, e.g. voucher/promo code.
@@ -377,12 +374,12 @@ class OtpDetectorTest {
                 "Use code: 50OFF for a 50% off! Ref: 123456",
             )
         for (invalidOtp in invalidCodeKeywordContexts) {
-            Assert.assertFalse(containsOtp(invalidOtp))
+            Assert.assertFalse(OtpDetector.containsOtp(invalidOtp, englishLanguageTagList))
         }
     }
 
     @Test
-    fun testContainsOtp_withCodeKeyword_validContext() {
+    fun containsOtp_english_withCodeKeyword_validContext() {
         val validCodeKeywordContexts =
             listOf(
                 // Code that is not followed by an alphanumeric token.
@@ -397,19 +394,12 @@ class OtpDetectorTest {
                 "123456 is your code:",
             )
         for (validOtp in validCodeKeywordContexts) {
-            Assert.assertTrue(containsOtp(validOtp))
+            Assert.assertTrue(OtpDetector.containsOtp(validOtp, englishLanguageTagList))
         }
     }
 
-
     @Test
-    fun testContainsOtpCode_nonEnglish() {
-        val textWithOtp = "1234 是您的一次性代碼" // 1234 is your one time code
-        Assert.assertFalse(containsOtp(textWithOtp))
-    }
-
-    @Test
-    fun testContainsOtp_englishSpecificRegex() {
+    fun containsOtp_english_englishSpecificRegex() {
         val englishFalsePositive = "This is a false positive 4543"
         val englishContextWords =
             listOf(
@@ -435,20 +425,26 @@ class OtpDetectorTest {
         val codeInNextSentence = "context word: code. This sentence has the actual value of 434343"
         val codeInSentenceAfterNewline = "your code is \n 34343"
 
-        Assert.assertFalse(containsOtp(englishFalsePositive))
+        Assert.assertFalse(OtpDetector.containsOtp(englishFalsePositive, englishLanguageTagList))
         for (context in englishContextWords) {
             val englishTruePositive = "$context $englishFalsePositive"
-            Assert.assertTrue(containsOtp(englishTruePositive))
+            Assert.assertTrue(OtpDetector.containsOtp(englishTruePositive, englishLanguageTagList))
         }
         for (context in englishContextWordsCase) {
             val englishTruePositive = "$context $englishFalsePositive"
-            Assert.assertTrue(containsOtp(englishTruePositive))
+            Assert.assertTrue(OtpDetector.containsOtp(englishTruePositive, englishLanguageTagList))
         }
         for (falseContext in englishContextSubstrings) {
             val anotherFalsePositive = "$falseContext $englishFalsePositive"
-            Assert.assertFalse(containsOtp(anotherFalsePositive))
+            Assert.assertFalse(OtpDetector.containsOtp(anotherFalsePositive, englishLanguageTagList))
         }
-        Assert.assertTrue(containsOtp(codeInNextSentence))
-        Assert.assertTrue(containsOtp(codeInSentenceAfterNewline))
+        Assert.assertTrue(OtpDetector.containsOtp(codeInNextSentence, englishLanguageTagList))
+        Assert.assertTrue(OtpDetector.containsOtp(codeInSentenceAfterNewline, englishLanguageTagList))
+    }
+
+    @Test
+    fun containsOtp_english_nonEnglishFalse() {
+        val textWithOtp = "1234 是您的一次性代碼" // 1234 is your one time code
+        Assert.assertFalse(OtpDetector.containsOtp(textWithOtp, englishLanguageTagList))
     }
 }

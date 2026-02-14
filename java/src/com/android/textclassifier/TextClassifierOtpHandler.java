@@ -20,12 +20,9 @@ import android.view.textclassifier.TextLanguage;
 import android.view.textclassifier.TextLinks;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 
 import com.android.textclassifier.common.base.TcLog;
 import com.android.textclassifier.utils.TextClassifierUtils;
-
-import com.google.common.annotations.VisibleForTesting;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -49,33 +46,12 @@ class TextClassifierOtpHandler {
   public static void addOtpLink(@NonNull String text,
           @NonNull TextLinks.Builder builder,
           @NonNull List<String> detectedLanguageTags) {
-    if (!containsOtp(text, detectedLanguageTags)) {
+    if (!OtpDetector.containsOtp(text, detectedLanguageTags)) {
       return;
     }
     final Map<String, Float> entityScores = Collections.singletonMap(TextClassifierUtils.TYPE_OTP,
             1f);
     builder.addLink(0, 0, entityScores, new Bundle());
-  }
-
-  /**
-   * Checks if a string of text might contain an OTP, based on several regular expressions, and
-   * potentially using a textClassifier to eliminate false positives
-   *
-   * @param text                 The text whose content should be checked.
-   * @param detectedLanguageTags The language tags of the text.
-   * @return {@code true} if an OTP is determined to be in the text, {@code false} otherwise.
-   */
-  @VisibleForTesting
-  protected static boolean containsOtp(
-          @NonNull String text,
-          @NonNull List<String> detectedLanguageTags) {
-    if (detectedLanguageTags.isEmpty()) {
-      return false;
-    }
-    if (!OtpDetector.containsOtpLikePattern(text)) {
-      return false;
-    }
-    return OtpDetector.containsOtpWithLanguage(text, detectedLanguageTags);
   }
 
   private TextClassifierOtpHandler() {}
