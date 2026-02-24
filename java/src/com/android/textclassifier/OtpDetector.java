@@ -25,7 +25,12 @@ import android.view.textclassifier.TextLanguage;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.android.textclassifier.otpconfig.OtpMatcherLanguageConfig;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
+
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -37,48 +42,8 @@ import java.util.regex.Pattern;
  * to be easily exported and built as a standalone library.
  */
 public class OtpDetector {
-  private static final int PATTERN_FLAGS =
-      Pattern.DOTALL | Pattern.CASE_INSENSITIVE | Pattern.MULTILINE;
-
-  private static ThreadLocal<Matcher> compileToRegex(String pattern) {
-    return ThreadLocal.withInitial(() -> Pattern.compile(pattern, PATTERN_FLAGS).matcher(""));
-  }
 
   private static final float TC_THRESHOLD = 0.6f;
-
-  private static final ArrayMap<String, ThreadLocal<Matcher>> EXTRA_LANG_OTP_REGEX =
-      new ArrayMap<>();
-
-  private static final ThreadLocal<Matcher> OTP_REGEX = compileToRegex(RegExStrings.ALL_OTP);
-
-  /**
-   * A combination of common false positives. These matches are expected to be longer than (or equal
-   * in length to) otp matches
-   */
-  private static final ThreadLocal<Matcher> FALSE_POSITIVE_REGEX =
-      compileToRegex(RegExStrings.FALSE_POSITIVE);
-
-  /**
-   * Creates a regular expression to match any of a series of individual words, case insensitive. It
-   * also verifies the position of the word, relative to the OTP match
-   */
-  private static ThreadLocal<Matcher> createDictionaryRegex(String[] words) {
-    StringBuilder regex = new StringBuilder("(");
-    for (int i = 0; i < words.length; i++) {
-      String boundedWord = "\\b" + words[i] + "\\b";
-      regex.append(boundedWord);
-      if (i != words.length - 1) {
-        regex.append("|");
-      }
-    }
-    regex.append(")");
-    return compileToRegex(regex.toString());
-  }
-
-  static {
-    EXTRA_LANG_OTP_REGEX.put(
-        ULocale.ENGLISH.toLanguageTag(), createDictionaryRegex(RegExStrings.englishContextWords));
-  }
 
   /**
    * Checks if a string of text might contain an OTP, based on several regular expressions, and
@@ -97,37 +62,28 @@ public class OtpDetector {
   public static boolean containsOtp(
           @NonNull String text,
           @NonNull TextClassifier tc) {
-    if (!containsOtpLikePattern(text)) {
-      return false;
-    }
-
     TextLanguage language = getTextLanguage(text, tc);
-    return containsOtpWithLanguage(text, language);
-  }
-
-  /**
-   * Checks if the input text likely contains a language-specific keyword commonly associated with
-   * OTP, based on the provided language hint.
-   *
-   * <p>This method first attempts to determine a high-confidence {@link ULocale} corresponding to
-   * the given {@link TextLanguage}. If a reliable locale cannot be determined, it assumes no
-   * relevant OTP keyword is present for that language. Otherwise, it delegates to
-   * {@link #hasLanguageSpecificOtpWord} to perform the actual check using the language tag derived
-   * from the determined locale.
-   *
-   * @param text The input text to scan for OTP keywords. Must not be null.
-   * @param language The language hint for the input text, used to determine the appropriate locale
-   * for keyword matching. Must not be null.
-   * @return {@code true} if the text is determined to contain a language-specific OTP keyword
-   * matching the language hint, {@code false} otherwise (including cases where the language
-   * could not be confidently identified or no specific OTP keyword is found).
-   */
-  protected static boolean containsOtpWithLanguage(@NonNull String text, @NonNull TextLanguage language) {
-    ULocale uLocale = getLanguageWithRegex(language);
+    ULocale uLocale = getHighestConfidenceLocale(language);
     if (uLocale == null) {
       return false;
     }
-    return hasLanguageSpecificOtpWord(text, uLocale.toLanguageTag());
+    return containsOtp(text, /* detectedLanguageTags= */ ImmutableList.of(uLocale.toLanguageTag()));
+  }
+
+  /**
+   * Checks if a string of text might contain an OTP, based on several regular expressions.
+   *
+   * @param text The text whose content should be checked.
+   * @param detectedLanguageTags The language tags of the text.
+   * @return {@code true} if an OTP is determined to be in the text, {@code false} otherwise.
+   */
+  protected static boolean containsOtp(@NonNull String text, @NonNull List<String> detectedLanguageTags) {
+    for (String languageTag : detectedLanguageTags) {
+      if (containsOtpLikePattern(text, languageTag) && containsOtpContextWord(text, languageTag)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
@@ -138,14 +94,21 @@ public class OtpDetector {
    * as phone numbers or dates.</p>
    *
    * @param text The text to be checked.
+   * @param languageTag The language tag (e.g., "en", "es", "fr") for which to check.
    * @return {@code true} if the text contains an OTP-like pattern, {@code false} otherwise.
    */
-  protected static boolean containsOtpLikePattern(String text) {
-    Set<String> otpMatches = getAllMatches(text, OTP_REGEX.get());
+  @VisibleForTesting
+  protected static boolean containsOtpLikePattern(@NonNull String text, @NonNull String languageTag) {
+    OtpMatcherLanguageConfig otpMatcherConfig = OtpMatcherLanguageConfig.fromLanguageTag(languageTag);
+    if (otpMatcherConfig == null) {
+      return false;
+    }
+
+    Set<String> otpMatches = getAllMatches(text, otpMatcherConfig.getOtpMatcher().get());
     if (otpMatches.isEmpty()) {
       return false;
     }
-    Set<String> falsePositives = getAllMatches(text, FALSE_POSITIVE_REGEX.get());
+    Set<String> falsePositives = getAllMatches(text, otpMatcherConfig.getFalsePositiveMatcher().get());
 
     // This optional, but having this would help with performance
     // Example: "Your OTP code is 1234 and this is sent on 01-01-2001"
@@ -172,7 +135,7 @@ public class OtpDetector {
   }
 
   /**
-   * Checks if the given text contains a language-specific word or phrase associated with OTPs.
+   * Checks if the given text contains a language-specific context word or phrase associated with OTPs.
    * This method uses regular expressions defined for specific languages to identify these words.
    *
    * @param text The text to check.
@@ -180,11 +143,12 @@ public class OtpDetector {
    * @return {@code true} if the text contains a language-specific OTP word, {@code false} otherwise.
    *         Returns {@code false} if no language-specific regex is defined for the given tag.
    */
-  private static boolean hasLanguageSpecificOtpWord(@NonNull String text, @NonNull String languageTag) {
-    if (!EXTRA_LANG_OTP_REGEX.containsKey(languageTag)){
+  private static boolean containsOtpContextWord(@NonNull String text, @NonNull String languageTag) {
+    OtpMatcherLanguageConfig otpMatcherConfig = OtpMatcherLanguageConfig.fromLanguageTag(languageTag);
+    if (otpMatcherConfig == null) {
       return false;
     }
-    Matcher languageSpecificMatcher = EXTRA_LANG_OTP_REGEX.get(languageTag).get();
+    Matcher languageSpecificMatcher = otpMatcherConfig.getContextWordsMatcher().get();
     if (languageSpecificMatcher == null) {
       return false;
     }
@@ -208,17 +172,16 @@ public class OtpDetector {
   }
 
   // Will return the language with the highest confidence score that meets the minimum threshold,
-  // and has a language-specific regex, null otherwise
+  // null otherwise
   @Nullable
-  private static ULocale getLanguageWithRegex(@NonNull TextLanguage lang) {
+  private static ULocale getHighestConfidenceLocale(@NonNull TextLanguage lang) {
     float highestConfidence = 0;
     ULocale highestConfidenceLocale = null;
     for (int i = 0; i < lang.getLocaleHypothesisCount(); i++) {
       ULocale locale = lang.getLocale(i);
       float confidence = lang.getConfidenceScore(locale);
       if (confidence >= TC_THRESHOLD
-              && confidence >= highestConfidence
-              && EXTRA_LANG_OTP_REGEX.containsKey(locale.toLanguageTag())) {
+              && confidence >= highestConfidence) {
         highestConfidence = confidence;
         highestConfidenceLocale = locale;
       }
@@ -227,115 +190,4 @@ public class OtpDetector {
   }
 
   private OtpDetector() {}
-
-  private static class RegExStrings {
-    /*
-     * A regex matching a line start, open paren, arrow, colon (not proceeded by a digit), dash
-     * preceded by a letter, open/close square bracket, equals sign, double or single quote,
-     * ideographic char, or a space that is not preceded by a number.
-     * It will not consume the start char (meaning START won't be included in the matched string)
-     */
-    private static final String START =
-            "(^|(?<=((^|[^0-9])\\s)|[>\\](\"'=\\[\\p{IsIdeographic}]|[^0-9][:]|[A-Za-z]-))";
-
-    /*
-     * A regex matching a line end, a space that is not followed by a number, an ideographic char, or
-     * a period, close paren, close square bracket, single or double quote, exclamation point,
-     * question mark, or comma. It will not consume the end char
-     */
-    private static final String END = "(?=\\s[^0-9]|$|\\p{IsIdeographic}|[.?!,)'\\]\"])";
-
-    private static final String ALL_OTP;
-
-    static {
-      /*
-       * One single OTP char. Currently, we only support numerical OTPs.
-       * We may support alphanumerical OTPs in the future.
-       */
-      final String OTP_CHAR = "\\d";
-
-      /* One OTP char, followed by an optional dash */
-      final String OTP_CHAR_WITH_DASH = format("(%s-?)", OTP_CHAR);
-
-      /*
-       * Matches between 3 and 8 otp chars, with dashes in between. Here, we are assuming an OTP code is
-       * 3-8 characters long. The last char must not be followed by a dash
-       */
-      final String THREE_TO_EIGHT_DIGITS_POTENTIALLY_WITH_DASH = format("(%s{2,7}%s)",
-                                                                        OTP_CHAR_WITH_DASH, OTP_CHAR);
-
-      /* A regex matching two pairs of 3 digits (ex "123 456") */
-      final String SIX_DIGITS_WITH_SPACE = "(\\d{3}\\s\\d{3})";
-
-      /*
-       * Combining the regular expressions above, we get an OTP regex that does the following:
-       * 1. Search for START,
-       * 2. Match ONE of:
-       *    a. Numeric sequence of length 3-8 with optional dashes, or
-       *    b. Pair of 3 digit codes separated by a space,
-       * 3. Match END.
-       * Examples: "6454", " 345 678.", "[YDT-456]"
-       */
-      ALL_OTP = format("%s(%s|%s)%s",
-                       START, THREE_TO_EIGHT_DIGITS_POTENTIALLY_WITH_DASH, SIX_DIGITS_WITH_SPACE, END);
-    }
-
-    private static final String FALSE_POSITIVE;
-
-    static {
-      /*
-       * A Date regular expression. Looks for dates with the month, day, and year separated by dashes.
-       * Handles one and two digit months and days, and four or two-digit years. It makes the following
-       * assumptions: Dates and months will never be higher than 39 If a four digit year is used, the
-       * leading digit will be 1 or 2
-       */
-      final String DATE_WITH_DASHES = "([0-3]?\\d-[0-3]?\\d-([12]\\d)?\\d\\d)";
-
-      /*
-       * matches a ten digit phone number, when the area code is separated by a space or dash. Supports
-       * optional parentheses around the area code, and an optional dash or space in between the rest of
-       * the numbers. This format registers as an otp match due to the space between the area code and
-       * the rest, but shouldn't.
-       */
-      final String PHONE_WITH_SPACE = "(\\(?\\d{3}\\)?(-|\\s)?\\d{3}(-|\\s)?\\d{4})";
-
-
-      /*
-       * Matches informational last digits of identifiers (e.g. last 4 digits of credit card,
-       * bank account, etc).
-       */
-      final String LAST_DIGITS_OF_IDENTIFIER = "(ending(\\swith)?|card|id|number)\\s\\d{3,8}";
-
-      /*
-       * A combination of common false positives. These matches are expected to be longer than (or equal
-       * in length to) otp matches.
-       */
-      FALSE_POSITIVE = format("%s(%s|%s|%s)%s",
-                              START, DATE_WITH_DASHES, PHONE_WITH_SPACE, LAST_DIGITS_OF_IDENTIFIER, END);
-    }
-
-    /**
-     * A list of regular expressions representing words found in an OTP context (non case sensitive)
-     * Note: TAN is short for Transaction Authentication Number
-     */
-    private static final String[] englishContextWords =
-            new String[] {
-                    "pin",
-                    "pass[-\\s]?(code|word)",
-                    "TAN",
-                    "otp",
-                    "2fa",
-                    "(two|2)[-\\s]?factor",
-                    "log[-\\s]?in",
-                    "auth(enticat(e|ion))?",
-                    // Match 'code' word that is not followed by alphanumerics, because they tend to
-                    // be vouchers or promo code (e.g., code 743a, or code:bzy6)
-                    "code(?!:?\\s?([a-zA-Z]{1,10}\\d|\\d{1,10}[a-zA-Z]))",
-                    "secret",
-                    "verif(y|ication)",
-                    "one(\\s|-)?time",
-                    "access",
-                    "validat(e|ion)"
-            };
-  }
 }

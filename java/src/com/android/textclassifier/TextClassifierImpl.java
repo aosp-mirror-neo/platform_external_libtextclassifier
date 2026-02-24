@@ -80,6 +80,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import javax.annotation.Nullable;
 
 /**
@@ -92,6 +93,8 @@ import javax.annotation.Nullable;
 final class TextClassifierImpl {
 
   private static final String TAG = "TextClassifierImpl";
+
+  private static final Set<String> OTP_TYPES = Set.of(TextClassifierUtils.TYPE_OTP, TextClassifierUtils.TYPE_SMS_RETRIEVER_OTP, TextClassifierUtils.TYPE_SMS_WEB_OTP);
 
   private final Context context;
   private final ModelFileManager modelFileManager;
@@ -297,9 +300,12 @@ final class TextClassifierImpl {
                     getEntitiesForHints(request.getEntityConfig().getHints()))
             : settings.getEntityListDefault();
 
+    LangIdModel langId = getLangIdImpl();
+    ImmutableList<String> detectedLanguageTags = detectLanguageTags(langId, request.getText());
+
     if (TextClassifierUtils.isOtpClassificationEnabled() && entitiesToIdentify.contains(
             TextClassifierUtils.TYPE_OTP)) {
-      TextClassifierOtpHandler.addOtpLink(request.getText().toString(), this, builder);
+      TextClassifierOtpHandler.addOtpLink(request.getText().toString(), builder, detectedLanguageTags);
     }
 
     if (TextClassifierUtils.isAtLeast25Q4()
@@ -315,41 +321,41 @@ final class TextClassifierImpl {
       TextClassifierSmsWebOtpHandler.addLink(request, builder, context);
     }
 
-    final String localesString = concatenateLocales(request.getDefaultLocales());
-    LangIdModel langId = getLangIdImpl();
-    ImmutableList<String> detectLanguageTags = detectLanguageTags(langId, request.getText());
-    final LocaleList detectedLocaleList =
-        LocaleList.forLanguageTags(String.join(",", detectLanguageTags));
-    final AnnotatorModel annotatorImpl =
-        getAnnotatorImpl(request.getDefaultLocales(), detectedLocaleList);
-    final boolean isSerializedEntityDataEnabled =
-        ExtrasUtils.isSerializedEntityDataEnabled(request);
-    final AnnotatorModel.AnnotatedSpan[] annotations =
-        annotatorImpl.annotate(
-            textString,
-            AnnotatorModel.AnnotationOptions.builder()
-                .setReferenceTimeMsUtc(refTime.toInstant().toEpochMilli())
-                .setReferenceTimezone(refTime.getZone().getId())
-                .setLocales(localesString)
-                .setDetectedTextLanguageTags(String.join(",", detectLanguageTags))
-                .setEntityTypes(entitiesToIdentify)
-                .setAnnotationUsecase(AnnotatorModel.AnnotationUsecase.SMART.getValue())
-                .setIsSerializedEntityDataEnabled(isSerializedEntityDataEnabled)
-                .build());
-    for (AnnotatorModel.AnnotatedSpan span : annotations) {
-      final AnnotatorModel.ClassificationResult[] results = span.getClassification();
-      if (results.length == 0 || !entitiesToIdentify.contains(results[0].getCollection())) {
-        continue;
+    if (!OTP_TYPES.containsAll(entitiesToIdentify)) {
+      final String localesString = concatenateLocales(request.getDefaultLocales());
+      final LocaleList detectedLocaleList =
+          LocaleList.forLanguageTags(String.join(",", detectedLanguageTags));
+      final AnnotatorModel annotatorImpl =
+          getAnnotatorImpl(request.getDefaultLocales(), detectedLocaleList);
+      final boolean isSerializedEntityDataEnabled =
+          ExtrasUtils.isSerializedEntityDataEnabled(request);
+      final AnnotatorModel.AnnotatedSpan[] annotations =
+          annotatorImpl.annotate(
+              textString,
+              AnnotatorModel.AnnotationOptions.builder()
+                  .setReferenceTimeMsUtc(refTime.toInstant().toEpochMilli())
+                  .setReferenceTimezone(refTime.getZone().getId())
+                  .setLocales(localesString)
+                  .setDetectedTextLanguageTags(String.join(",", detectedLanguageTags))
+                  .setEntityTypes(entitiesToIdentify)
+                  .setAnnotationUsecase(AnnotatorModel.AnnotationUsecase.SMART.getValue())
+                  .setIsSerializedEntityDataEnabled(isSerializedEntityDataEnabled)
+                  .build());
+      for (AnnotatorModel.AnnotatedSpan span : annotations) {
+        final AnnotatorModel.ClassificationResult[] results = span.getClassification();
+        if (results.length == 0 || !entitiesToIdentify.contains(results[0].getCollection())) {
+          continue;
+        }
+        final Map<String, Float> entityScores = new ArrayMap<>();
+        for (AnnotatorModel.ClassificationResult result : results) {
+          entityScores.put(result.getCollection(), result.getScore());
+        }
+        Bundle extras = new Bundle();
+        if (isSerializedEntityDataEnabled) {
+          ExtrasUtils.putEntities(extras, results);
+        }
+        builder.addLink(span.getStartIndex(), span.getEndIndex(), entityScores, extras);
       }
-      final Map<String, Float> entityScores = new ArrayMap<>();
-      for (AnnotatorModel.ClassificationResult result : results) {
-        entityScores.put(result.getCollection(), result.getScore());
-      }
-      Bundle extras = new Bundle();
-      if (isSerializedEntityDataEnabled) {
-        ExtrasUtils.putEntities(extras, results);
-      }
-      builder.addLink(span.getStartIndex(), span.getEndIndex(), entityScores, extras);
     }
     final TextLinks links = builder.build();
     final long endTimeMs = System.currentTimeMillis();
