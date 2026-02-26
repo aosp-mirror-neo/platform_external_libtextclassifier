@@ -89,7 +89,9 @@ android_library {
         "com.android.extservices",
     ],
     jarjar_rules: "jarjar-rules.txt",
-
+    lint: {
+        baseline_filename: "lint-baseline.xml",
+    },
 }
 
 java_library {
