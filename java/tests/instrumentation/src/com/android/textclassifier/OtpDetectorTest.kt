@@ -41,6 +41,9 @@ class OtpDetectorTest {
     private val englishLanguageTag = ULocale.ENGLISH.toLanguageTag()
     private val englishLanguageTagList = listOf(englishLanguageTag)
 
+    private val koreanLanguageTag = ULocale.KOREAN.toLanguageTag()
+    private val koreanLanguageTagList = listOf(koreanLanguageTag)
+
     private lateinit var context: Context
     private lateinit var deviceConfig: TestingDeviceConfig
     private lateinit var settings: TextClassifierSettings
@@ -455,6 +458,43 @@ class OtpDetectorTest {
     fun containsOtp_english_nonEnglishFalse() {
         val textWithOtp = "1234 是您的一次性代碼" // 1234 is your one time code
         Assert.assertFalse(OtpDetector.containsOtp(textWithOtp, englishLanguageTagList))
+    }
+
+    @Test
+    fun containsOtp_korean_detectsOtpWithValidContextWord() {
+        val messagesWithOtp =
+            listOf(
+                "[Web발신] [원스토어] 인증번호는 [411090]입니다.",
+                "본인확인 인증번호는 [171611]입니다",
+                "[국외발신]\nNetflix 인증 코드: 321654",
+                "[국외발신]\n111444은(는) 확인 코드이며 보내온 곳은 Payoneer",
+                "[SCI평가정보] 본인인증번호는 664067입니다. 정확히 입력해주세요.",
+                "[국제발신]649640는귀하의 Shopping OTP입니다.",
+            )
+        for (message in messagesWithOtp) {
+            Assert.assertTrue(OtpDetector.containsOtp(message, koreanLanguageTagList))
+        }
+    }
+
+    @Test
+    fun containsOtp_korean_doesNotDetectNonOtp() {
+        val messagesWithoutOtp =
+            listOf(
+                "고객센터 1899-0522", // Phone number
+                "유효기간 : 2025-06-10 ~ 2025-08-09", // Date
+                "완료일자 : 2022년 12월 30일", // Date
+                "- 결제일시 : 2024. 12. 18. 16:26", // Date
+            )
+        for (message in messagesWithoutOtp) {
+            Assert.assertFalse(OtpDetector.containsOtp(message, koreanLanguageTagList))
+        }
+
+        // Avoid common false positives
+        val validContextWord = "승인 번호"
+        for (message in messagesWithoutOtp) {
+            Assert.assertFalse(OtpDetector.containsOtp("$validContextWord $message", koreanLanguageTagList))
+            Assert.assertFalse(OtpDetector.containsOtp("$message $validContextWord", koreanLanguageTagList))
+        }
     }
 
     @Test
