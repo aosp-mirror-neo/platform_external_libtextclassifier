@@ -30,13 +30,15 @@ class OtpMatcherLanguageConfigTest {
 
     @Test
     fun fromLanguageTag_english_returnEnglishConfig() {
-        val otpMatcherConfig = OtpMatcherLanguageConfig.fromLanguageTag(ULocale.ENGLISH.toLanguageTag())
+        val otpMatcherConfig =
+            OtpMatcherLanguageConfig.fromLanguageTag(ULocale.ENGLISH.toLanguageTag())
         assertEquals(otpMatcherConfig!!.languageTag, ULocale.ENGLISH.toLanguageTag())
     }
 
     @Test
     fun fromLanguageTag_english_matchEnglishPatterns() {
-        val otpMatcherConfig = OtpMatcherLanguageConfig.fromLanguageTag(ULocale.ENGLISH.toLanguageTag())
+        val otpMatcherConfig =
+            OtpMatcherLanguageConfig.fromLanguageTag(ULocale.ENGLISH.toLanguageTag())
 
         val otpMatcher = otpMatcherConfig!!.otpMatcher.get()!!
         val falsePositiveMatcher = otpMatcherConfig!!.falsePositiveMatcher.get()!!
@@ -52,12 +54,30 @@ class OtpMatcherLanguageConfigTest {
         otpMatcher.reset("12") // Too short (at least 3 digits for english)
         assertFalse(otpMatcher.find())
 
-        assertEquals(getAllMatches("ending with 4412", falsePositiveMatcher), setOf("ending with 4412")) // Credit card ending
-        assertEquals(getAllMatches("Call (650) 253-0000 for help", falsePositiveMatcher), setOf("(650) 253-0000")) // Phone number
-        assertEquals(getAllMatches("Reach us at 650 253-0000", falsePositiveMatcher), setOf("650 253-0000")) // Phone number
-        assertEquals(getAllMatches("Please contact 650-253-0000", falsePositiveMatcher), setOf("650-253-0000")) // Phone number
-        assertEquals(getAllMatches("Expiry: 05-02-2026", falsePositiveMatcher), setOf("05-02-2026")) // Date
-        assertEquals(getAllMatches("5-2-2026 or until further notice", falsePositiveMatcher), setOf("5-2-2026")) // Date
+        // Credit card ending
+        assertEquals(
+            getAllMatches("ending with 4412", falsePositiveMatcher), setOf("ending with 4412")
+        )
+        // Phone number
+        assertEquals(
+            getAllMatches("Call (650) 253-0000 for help", falsePositiveMatcher),
+            setOf("(650) 253-0000")
+        )
+        assertEquals(
+            getAllMatches("Reach us at 650 253-0000", falsePositiveMatcher), setOf("650 253-0000")
+        )
+        assertEquals(
+            getAllMatches("Please contact 650-253-0000", falsePositiveMatcher),
+            setOf("650-253-0000")
+        )
+        // Date
+        assertEquals(
+            getAllMatches("Expiry: 05-02-2026", falsePositiveMatcher), setOf("05-02-2026")
+        )
+        assertEquals(
+            getAllMatches("5-2-2026 or until further notice", falsePositiveMatcher),
+            setOf("5-2-2026")
+        )
 
         assertFalse(falsePositiveMatcher.reset("ending with").find())
 
@@ -78,7 +98,8 @@ class OtpMatcherLanguageConfigTest {
 
     @Test
     fun fromLanguageTag_korean_matchKoreanPatterns() {
-        val otpMatcherConfig = OtpMatcherLanguageConfig.fromLanguageTag(ULocale.KOREAN.toLanguageTag())
+        val otpMatcherConfig =
+            OtpMatcherLanguageConfig.fromLanguageTag(ULocale.KOREAN.toLanguageTag())
 
         val otpMatcher = otpMatcherConfig!!.otpMatcher.get()!!
         val falsePositiveMatcher = otpMatcherConfig!!.falsePositiveMatcher.get()!!
@@ -99,9 +120,13 @@ class OtpMatcherLanguageConfigTest {
         assertEquals(getAllMatches("- 기간 : 2026.01.01", falsePositiveMatcher), setOf("2026.01.01"))
         assertEquals(getAllMatches("- 기간 : 2026.1.1", falsePositiveMatcher), setOf("2026.1.1"))
         assertEquals(getAllMatches("- 기간 : 2026.1.10", falsePositiveMatcher), setOf("2026.1.10"))
-        assertEquals(getAllMatches("- 기간 : 2026. 01. 01", falsePositiveMatcher), setOf("2026. 01. 01"))
+        assertEquals(
+            getAllMatches("- 기간 : 2026. 01. 01", falsePositiveMatcher), setOf("2026. 01. 01")
+        )
         assertEquals(getAllMatches("- 기간 : 2026. 1. 1", falsePositiveMatcher), setOf("2026. 1. 1"))
-        assertEquals(getAllMatches("- 기간 : 2026. 1. 10", falsePositiveMatcher), setOf("2026. 1. 10"))
+        assertEquals(
+            getAllMatches("- 기간 : 2026. 1. 10", falsePositiveMatcher), setOf("2026. 1. 10")
+        )
         assertEquals(getAllMatches("- 기간 : 2026. 01.", falsePositiveMatcher), setOf("2026. 01"))
         assertEquals(getAllMatches("- 기간 : 2026. 1.", falsePositiveMatcher), setOf("2026. 1"))
         assertEquals(getAllMatches("- 기간 : 2026-01-01", falsePositiveMatcher), setOf("2026-01-01"))
@@ -110,11 +135,15 @@ class OtpMatcherLanguageConfigTest {
         assertEquals(getAllMatches("- 기간 : 2026/01/01", falsePositiveMatcher), setOf("2026/01/01"))
         assertEquals(getAllMatches("- 기간 : 2026/1/1", falsePositiveMatcher), setOf("2026/1/1"))
         assertEquals(getAllMatches("- 기간 : 2026/1/10", falsePositiveMatcher), setOf("2026/1/10"))
-        assertEquals(getAllMatches("- 기간 : 2026년 1월 10일", falsePositiveMatcher), setOf("2026년 1월 10"))
+        assertEquals(
+            getAllMatches("- 기간 : 2026년 1월 10일", falsePositiveMatcher), setOf("2026년 1월 10")
+        )
 
         // Phone number-like patterns
         assertEquals(getAllMatches("고객센터 문의 : 1234-5678", falsePositiveMatcher), setOf("1234-5678"))
-        assertEquals(getAllMatches("무료수신거부 080.123.4567", falsePositiveMatcher), setOf("080.123.4567"))
+        assertEquals(
+            getAllMatches("무료수신거부 080.123.4567", falsePositiveMatcher), setOf("080.123.4567")
+        )
         assertEquals(getAllMatches("☎ 02-1234-5678", falsePositiveMatcher), setOf("02-1234-5678"))
         assertEquals(getAllMatches("(800) 826-9983", falsePositiveMatcher), setOf("826-9983"))
 

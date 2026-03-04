@@ -1,6 +1,7 @@
 package com.android.textclassifier.otpconfig;
 
 import android.icu.util.ULocale;
+
 import androidx.annotation.Nullable;
 
 import java.util.HashMap;
@@ -10,7 +11,8 @@ import java.util.regex.Pattern;
 
 public final class OtpMatcherLanguageConfig {
 
-    private static final int PATTERN_FLAGS = Pattern.DOTALL | Pattern.CASE_INSENSITIVE | Pattern.MULTILINE;
+    private static final int PATTERN_FLAGS =
+            Pattern.DOTALL | Pattern.CASE_INSENSITIVE | Pattern.MULTILINE;
     private static final Map<String, OtpMatcherLanguageConfig> CONFIG_MAP = new HashMap<>();
 
     private static final OtpMatcherLanguageConfig ENGLISH = new OtpMatcherLanguageConfig(
@@ -54,7 +56,8 @@ public final class OtpMatcherLanguageConfig {
     }
 
     /**
-     * Call this method in the constructor to compile the Pattern once, but creates a Matcher per thread.
+     * Call this method in the constructor to compile the Pattern once, but creates a Matcher per
+     * thread.
      */
     private static ThreadLocal<Matcher> createMatcher(String patternStr) {
         Pattern pattern = Pattern.compile(patternStr, PATTERN_FLAGS);
