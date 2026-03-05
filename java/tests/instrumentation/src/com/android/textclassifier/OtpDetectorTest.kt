@@ -41,6 +41,9 @@ class OtpDetectorTest {
     private val englishLanguageTag = ULocale.ENGLISH.toLanguageTag()
     private val englishLanguageTagList = listOf(englishLanguageTag)
 
+    private val koreanLanguageTag = ULocale.KOREAN.toLanguageTag()
+    private val koreanLanguageTagList = listOf(koreanLanguageTag)
+
     private lateinit var context: Context
     private lateinit var deviceConfig: TestingDeviceConfig
     private lateinit var settings: TextClassifierSettings
@@ -61,15 +64,25 @@ class OtpDetectorTest {
         this.settings = TextClassifierSettings(deviceConfig, /* isWear= */ false)
         this.annotatorModelCache = LruCache(2)
         this.tc = Mockito.mock(TextClassifier::class.java)
-        Mockito.doReturn(TextLanguage.Builder().putLocale(ULocale.ENGLISH, 0.9f).build())
-            .`when`(tc)
-            .detectLanguage(any())
     }
 
     @Test
-    fun containsOtp_correctResult() {
+    fun containsOtp_providedTextClassifier_correctResult() {
+        Mockito.doReturn(TextLanguage.Builder().putLocale(ULocale.ENGLISH, 0.9f).build())
+            .`when`(tc)
+            .detectLanguage(any())
         Assert.assertFalse(OtpDetector.containsOtp("hello", this.tc))
         Assert.assertTrue(OtpDetector.containsOtp("Your OTP code is 123456", this.tc))
+    }
+
+    @Test
+    fun containsOtp_providedTextClassifier_correctResultForLanguageAgnosticOtpSignature() {
+        // Intentionally returning a language tag with low confidence.
+        Mockito.doReturn(TextLanguage.Builder().putLocale(ULocale.ENGLISH, 0.3f).build())
+            .`when`(tc)
+            .detectLanguage(any())
+        Assert.assertFalse(OtpDetector.containsOtp("Your OTP code is 123456", this.tc))
+        Assert.assertTrue(OtpDetector.containsOtp("<#> Your OTP code is 123456", this.tc))
     }
 
     @Test
@@ -104,8 +117,7 @@ class OtpDetectorTest {
             )
 
         for (otpMessage in acceptedPinPatterns) {
-            Assert.assertTrue(OtpDetector.containsOtp(otpMessage, this.tc));
-            Assert.assertTrue(OtpDetector.containsOtp(otpMessage, englishLanguageTagList));
+            Assert.assertTrue(OtpDetector.containsOtp(otpMessage, englishLanguageTagList))
         }
     }
 
@@ -446,5 +458,69 @@ class OtpDetectorTest {
     fun containsOtp_english_nonEnglishFalse() {
         val textWithOtp = "1234 是您的一次性代碼" // 1234 is your one time code
         Assert.assertFalse(OtpDetector.containsOtp(textWithOtp, englishLanguageTagList))
+    }
+
+    @Test
+    fun containsOtp_korean_detectsOtpWithValidContextWord() {
+        val messagesWithOtp =
+            listOf(
+                "[Web발신] [원스토어] 인증번호는 [411090]입니다.",
+                "본인확인 인증번호는 [171611]입니다",
+                "[국외발신]\nNetflix 인증 코드: 321654",
+                "[국외발신]\n111444은(는) 확인 코드이며 보내온 곳은 Payoneer",
+                "[SCI평가정보] 본인인증번호는 664067입니다. 정확히 입력해주세요.",
+                "[국제발신]649640는귀하의 Shopping OTP입니다.",
+            )
+        for (message in messagesWithOtp) {
+            Assert.assertTrue(OtpDetector.containsOtp(message, koreanLanguageTagList))
+        }
+    }
+
+    @Test
+    fun containsOtp_korean_doesNotDetectNonOtp() {
+        val messagesWithoutOtp =
+            listOf(
+                "고객센터 1899-0522", // Phone number
+                "유효기간 : 2025-06-10 ~ 2025-08-09", // Date
+                "완료일자 : 2022년 12월 30일", // Date
+                "- 결제일시 : 2024. 12. 18. 16:26", // Date
+            )
+        for (message in messagesWithoutOtp) {
+            Assert.assertFalse(OtpDetector.containsOtp(message, koreanLanguageTagList))
+        }
+
+        // Avoid common false positives
+        val validContextWord = "승인 번호"
+        for (message in messagesWithoutOtp) {
+            Assert.assertFalse(OtpDetector.containsOtp("$validContextWord $message", koreanLanguageTagList))
+            Assert.assertFalse(OtpDetector.containsOtp("$message $validContextWord", koreanLanguageTagList))
+        }
+    }
+
+    @Test
+    fun containsOtp_detectsLanguageAgnosticOtpSignature() {
+        val validLanguageAgnosticOtp =
+            listOf(
+                "<#> Your MyApp code is 123456",
+                "[#] รหัสผ่านของคุณคือ 888555", // Your password is 888555
+            )
+        for (validOtp in validLanguageAgnosticOtp) {
+            // When an unsupported language tag is provided.
+            Assert.assertTrue(OtpDetector.containsOtp(validOtp, listOf("some-unsupported-lang")))
+            // When no language tag is provided.
+            Assert.assertTrue(OtpDetector.containsOtp(validOtp, listOf()))
+        }
+
+        val invalidLanguageAgnosticOtp =
+            listOf(
+                // When <#> is not at the very beginning of the text message.
+                // Translation: [Web transmission] Please enter KR Securities authentication number [789012].
+                "[Web발신] <#>KR증권 인증번호 [789012]을 입력해주세요.",
+                "[Web발신]\n<#>KR증권 인증번호 [789012]을 입력해주세요."
+            )
+        for (invalidOtp in invalidLanguageAgnosticOtp) {
+            Assert.assertFalse(OtpDetector.containsOtp(invalidOtp, listOf("some-unsupported-lang")))
+            Assert.assertFalse(OtpDetector.containsOtp(invalidOtp, listOf()))
+        }
     }
 }

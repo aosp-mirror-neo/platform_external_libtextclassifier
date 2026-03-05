@@ -2,7 +2,6 @@ package com.android.textclassifier.otpconfig;
 
 import android.icu.util.ULocale;
 import androidx.annotation.Nullable;
-import com.android.textclassifier.otpconfig.EnglishOtpPattern;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -18,11 +17,21 @@ public final class OtpMatcherLanguageConfig {
             ULocale.ENGLISH.toLanguageTag(),
             EnglishOtpPattern.OTP_PATTERN,
             EnglishOtpPattern.FALSE_POSITIVE_PATTERN,
-            EnglishOtpPattern.CONTEXT_WORDS_PATTERNS
+            EnglishOtpPattern.CONTEXT_WORDS_PATTERNS,
+            /* isSpaceDelimitedLanguage= */ true
+    );
+
+    private static final OtpMatcherLanguageConfig KOREAN = new OtpMatcherLanguageConfig(
+            ULocale.KOREAN.toLanguageTag(),
+            KoreanOtpPattern.OTP_PATTERN,
+            KoreanOtpPattern.FALSE_POSITIVE_PATTERN,
+            KoreanOtpPattern.CONTEXT_WORDS_PATTERNS,
+            /* isSpaceDelimitedLanguage= */ false
     );
 
     static {
         CONFIG_MAP.put(ENGLISH.languageTag, ENGLISH);
+        CONFIG_MAP.put(KOREAN.languageTag, KOREAN);
     }
 
     private final String languageTag;
@@ -34,12 +43,14 @@ public final class OtpMatcherLanguageConfig {
             String languageTag,
             String otpPatternStr,
             String falsePositivePatternStr,
-            String[] contextWordsPatterns) {
+            String[] contextWordsPatterns,
+            boolean isSpaceDelimitedLanguage) {
         this.languageTag = languageTag;
 
         this.otpMatcher = createMatcher(otpPatternStr);
         this.falsePositiveMatcher = createMatcher(falsePositivePatternStr);
-        this.contextWordsMatcher = createDictionaryMatcher(contextWordsPatterns);
+        this.contextWordsMatcher =
+                createDictionaryMatcher(contextWordsPatterns, isSpaceDelimitedLanguage);
     }
 
     /**
@@ -53,11 +64,16 @@ public final class OtpMatcherLanguageConfig {
     /**
      * Creates a regular expression to match any of a series of individual words regexes.
      */
-    private static ThreadLocal<Matcher> createDictionaryMatcher(String[] words) {
+    private static ThreadLocal<Matcher> createDictionaryMatcher(
+            String[] words, boolean isSpaceDelimitedLanguage) {
         StringBuilder regex = new StringBuilder("(");
         for (int i = 0; i < words.length; i++) {
-            String boundedWord = "\\b" + words[i] + "\\b";
-            regex.append(boundedWord);
+            if (isSpaceDelimitedLanguage) {
+                String boundedWord = "\\b" + words[i] + "\\b";
+                regex.append(boundedWord);
+            } else {
+                regex.append(words[i]);
+            }
             if (i != words.length - 1) {
                 regex.append("|");
             }

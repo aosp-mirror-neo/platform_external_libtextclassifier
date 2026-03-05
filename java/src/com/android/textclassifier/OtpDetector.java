@@ -15,10 +15,7 @@
  */
 package com.android.textclassifier;
 
-import static java.lang.String.format;
-
 import android.icu.util.ULocale;
-import android.util.ArrayMap;
 import android.view.textclassifier.TextClassifier;
 import android.view.textclassifier.TextLanguage;
 
@@ -45,6 +42,13 @@ public class OtpDetector {
 
   private static final float TC_THRESHOLD = 0.6f;
 
+  // Matches language-agnostic OTP signatures, such as "<#>" or "[#]" strictly at the beginning of
+  // the text (i.e., not using MULTILINE mode).
+  private static final Pattern LANGUAGE_AGNOSTIC_OTP_SIGNATURE_PATTERN =
+      Pattern.compile("^[<\\[]#[>\\]]");
+  private static final ThreadLocal<Matcher> LANGUAGE_AGNOSTIC_OTP_SIGNATURE_MATCHER =
+      ThreadLocal.withInitial(() -> LANGUAGE_AGNOSTIC_OTP_SIGNATURE_PATTERN.matcher(""));
+
   /**
    * Checks if a string of text might contain an OTP, based on several regular expressions, and
    * potentially using a textClassifier to eliminate false positives.
@@ -64,10 +68,9 @@ public class OtpDetector {
           @NonNull TextClassifier tc) {
     TextLanguage language = getTextLanguage(text, tc);
     ULocale uLocale = getHighestConfidenceLocale(language);
-    if (uLocale == null) {
-      return false;
-    }
-    return containsOtp(text, /* detectedLanguageTags= */ ImmutableList.of(uLocale.toLanguageTag()));
+    List<String> detectedLanguageTags =
+        uLocale == null ? ImmutableList.of() : ImmutableList.of(uLocale.toLanguageTag());
+    return containsOtp(text, detectedLanguageTags);
   }
 
   /**
@@ -78,12 +81,22 @@ public class OtpDetector {
    * @return {@code true} if an OTP is determined to be in the text, {@code false} otherwise.
    */
   protected static boolean containsOtp(@NonNull String text, @NonNull List<String> detectedLanguageTags) {
+    // Detects language-agnostic OTP signatures such as <#> and [#] for all languages, even without
+    // explicit context word detection.
+    if (containsLanguageAgnosticOtpSignature(text)) {
+      return true;
+    }
+
     for (String languageTag : detectedLanguageTags) {
       if (containsOtpLikePattern(text, languageTag) && containsOtpContextWord(text, languageTag)) {
         return true;
       }
     }
     return false;
+  }
+
+  private static boolean containsLanguageAgnosticOtpSignature(@NonNull String text) {
+    return LANGUAGE_AGNOSTIC_OTP_SIGNATURE_MATCHER.get().reset(text).find();
   }
 
   /**
