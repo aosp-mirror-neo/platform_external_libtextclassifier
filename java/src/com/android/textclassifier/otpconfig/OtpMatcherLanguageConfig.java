@@ -11,6 +11,10 @@ import java.util.regex.Pattern;
 
 public final class OtpMatcherLanguageConfig {
 
+    // ULocale supports many languages, but only includes constants for a few. Others must be
+    // defined manually.
+    static final String SPANISH_LANGUAGE_TAG = "es";
+
     private static final int PATTERN_FLAGS =
             Pattern.DOTALL | Pattern.CASE_INSENSITIVE | Pattern.MULTILINE;
     private static final Map<String, OtpMatcherLanguageConfig> CONFIG_MAP = new HashMap<>();
@@ -31,9 +35,18 @@ public final class OtpMatcherLanguageConfig {
             /* isSpaceDelimitedLanguage= */ false
     );
 
+    private static final OtpMatcherLanguageConfig SPANISH = new OtpMatcherLanguageConfig(
+            SPANISH_LANGUAGE_TAG,
+            SpanishOtpPattern.OTP_PATTERN,
+            SpanishOtpPattern.FALSE_POSITIVE_PATTERN,
+            SpanishOtpPattern.CONTEXT_WORDS_PATTERNS,
+            /* isSpaceDelimitedLanguage= */ true
+    );
+
     static {
         CONFIG_MAP.put(ENGLISH.languageTag, ENGLISH);
         CONFIG_MAP.put(KOREAN.languageTag, KOREAN);
+        CONFIG_MAP.put(SPANISH.languageTag, SPANISH);
     }
 
     private final String languageTag;

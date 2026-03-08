@@ -44,6 +44,9 @@ class OtpDetectorTest {
     private val koreanLanguageTag = ULocale.KOREAN.toLanguageTag()
     private val koreanLanguageTagList = listOf(koreanLanguageTag)
 
+    private val spanishLanguageTag = "es"
+    private val spanishLanguageTagList = listOf(spanishLanguageTag)
+
     private lateinit var context: Context
     private lateinit var deviceConfig: TestingDeviceConfig
     private lateinit var settings: TextClassifierSettings
@@ -532,6 +535,50 @@ class OtpDetectorTest {
             )
             Assert.assertFalse(
                 OtpDetector.containsOtp("$message $validContextWord", koreanLanguageTagList)
+            )
+        }
+    }
+
+    @Test
+    fun containsOtp_spanish_detectsOtpWithValidContextWord() {
+        val messagesWithOtp = listOf(
+            "Su codigo de verificacion para Rappi es: 1836.", // minimum 4 digits
+            "El código de verificación es [8495]", // with accented characters
+            "FB-58675 es tu código de confirmación de Facebook", // prefixed OTP
+            "No compartas el codigo con nadie\nTu codigo de WhatsApp es: 203-502", // with dash
+        )
+        for (message in messagesWithOtp) {
+            Assert.assertTrue(OtpDetector.containsOtp(message, spanishLanguageTagList))
+        }
+    }
+
+    @Test
+    fun containsOtp_spanish_doesNotDetectNonOtp() {
+        val messagesWithoutOtp = listOf(
+            // Date
+            "Ey! Tu paquete Mini va a valer el 17/04/2021!",
+            "Hola Estimado Cliente! Este beneficio es valido solo hoy, 30-06-2025.",
+            "Tu envío 8759898457 está entregado el\n2022-05-16 en 11:42.",
+            // Phone
+            "Para mas detalles, ingresa a tu app o consulta al 800 953 0334.",
+            "O comunícate a nuestro CAT 📞 *55 5447 8000* | *800 90 90000*",
+            "bien en Supernet o en Banca Telefonica (915 123 123).",
+            // Currency
+            "Su solicitud ha sido preaprobada con un limite disponible hasta \$26800.",
+        )
+        for (message in messagesWithoutOtp) {
+            Assert.assertFalse(OtpDetector.containsOtp(message, spanishLanguageTagList))
+        }
+
+        // containsOtp should return false, even when strong context word is present
+        // because it matches the false positive patterns.
+        val validContextWord = "otp"
+        for (message in messagesWithoutOtp) {
+            Assert.assertFalse(
+                OtpDetector.containsOtp("$validContextWord $message", spanishLanguageTagList)
+            )
+            Assert.assertFalse(
+                OtpDetector.containsOtp("$message $validContextWord", spanishLanguageTagList)
             )
         }
     }

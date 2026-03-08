@@ -162,6 +162,100 @@ class OtpMatcherLanguageConfigTest {
     }
 
     @Test
+    fun fromLanguageTag_spanish_matchesOtpPatterns() {
+        val config =
+            OtpMatcherLanguageConfig.fromLanguageTag(OtpMatcherLanguageConfig.SPANISH_LANGUAGE_TAG)
+        val matcher = config!!.otpMatcher.get()!!
+
+        assertEquals(
+            setOf("1234"),
+            getAllMatches("1234-Código de verificación", matcher)
+        )
+        assertEquals(
+            setOf("12345678"),
+            getAllMatches("G-12345678", matcher)
+        )
+        assertEquals(
+            setOf("123-456"),
+            getAllMatches("Código de verificación: 123-456", matcher)
+        )
+        assertEquals(
+            setOf("123 456"),
+            getAllMatches("123 456 es tu contraseña temporal", matcher)
+        )
+
+        // Too short (at least 4 digits for Spanish)
+        matcher.reset("123")
+        assertFalse(matcher.find())
+    }
+
+    @Test
+    fun fromLanguageTag_spanish_matchesFalsePositivePatterns() {
+        val config =
+            OtpMatcherLanguageConfig.fromLanguageTag(OtpMatcherLanguageConfig.SPANISH_LANGUAGE_TAG)
+        val matcher = config!!.falsePositiveMatcher.get()!!
+
+        // Date-like patterns
+        assertEquals(
+            setOf("2022-05-16"),
+            getAllMatches("está entregado el 2022-05-16 en 11:42.", matcher)
+        )
+        assertEquals(
+            setOf("26/05/2025"),
+            getAllMatches("la Atencion Telefonica del 26/05/2025", matcher)
+        )
+        assertEquals(
+            setOf("31-03-2025"),
+            getAllMatches("31-03-2025 de 11:00 a 12:00", matcher)
+        )
+
+        // Phone-like patterns
+        assertEquals(
+            setOf("55 5447 8000", "800 90 90000"),
+            getAllMatches("O comunícate a nuestro CAT 📞 *55 5447 8000* | *800 90 90000*", matcher)
+        )
+
+        // Currency-like patterns
+        assertEquals(
+            setOf("$7100"),
+            getAllMatches("Invita a amigos y gana \$7100 m.n.", matcher)
+        )
+    }
+
+    @Test
+    fun fromLanguageTag_spanish_matchesContextWordsPatterns() {
+        val config =
+            OtpMatcherLanguageConfig.fromLanguageTag(OtpMatcherLanguageConfig.SPANISH_LANGUAGE_TAG)
+        val matcher = config!!.contextWordsMatcher.get()!!
+
+        // Your verification code is
+        matcher.reset("Su codigo de verificacion es")
+        assertTrue(matcher.find())
+
+        // Your security code
+        matcher.reset("Tu código de seguridad")
+        assertTrue(matcher.find())
+
+        // For your new access code
+        matcher.reset("para tu nueva clave de acceso")
+        assertTrue(matcher.find())
+
+        // Access your digital banking from the app or website using your one-time password
+        matcher.reset(
+            "Accede a tu banca digital desde la app o la web con la contraseña de 1 solo uso"
+        )
+        assertTrue(matcher.find())
+
+        // Here's a special code just for you
+        matcher.reset("Aquí hay un código especial solo para ti")
+        assertFalse(matcher.find())
+
+        // Your K-Parcel order with code
+        matcher.reset("Tu pedido de K-Parcel con código")
+        assertFalse(matcher.find())
+    }
+
+    @Test
     fun fromLanguageTag_unknown_returnNull() {
         val otpMatcherConfig = OtpMatcherLanguageConfig.fromLanguageTag("unknown")
         assertNull(otpMatcherConfig)
