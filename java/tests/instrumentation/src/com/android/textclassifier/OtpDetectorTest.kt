@@ -47,6 +47,9 @@ class OtpDetectorTest {
     private val spanishLanguageTag = "es"
     private val spanishLanguageTagList = listOf(spanishLanguageTag)
 
+    private val bahasaLanguageTag = "id"
+    private val bahasaLanguageTagList = listOf(bahasaLanguageTag)
+
     private lateinit var context: Context
     private lateinit var deviceConfig: TestingDeviceConfig
     private lateinit var settings: TextClassifierSettings
@@ -616,6 +619,49 @@ class OtpDetectorTest {
                     ),
                 )
             }
+        }
+    }
+
+    @Test
+    fun containsOtp_bahasa_detectsOtpWithValidContextWord() {
+        val messagesWithOtp = listOf(
+            "Kode konfirmasi Anda adalah 324126.",
+            "Gunakan OTP:1022 untuk login aplikasi", // minimum 4 digits
+            "Kode OTP kamu adalah [1234]. Berlaku 5 mnt.", // surrounded by brackets
+            "AdaKami-18236 adalah kode rahasia.", // prefixed OTP
+            "314-617 adalah kode verifikasi anda." // with dash
+        )
+        for (message in messagesWithOtp) {
+            Assert.assertTrue(OtpDetector.containsOtp(message, bahasaLanguageTagList))
+        }
+    }
+
+    @Test
+    fun containsOtp_bahasa_doesNotDetectNonOtp() {
+        val messagesWithoutOtp = listOf(
+            // Phone number
+            "Call 0804 122 1000",
+            "No Telepon : 021-5020 8787",
+            // Currency
+            "Isi ulang Rp10000.0 berhasil.",
+            // Date
+            "Waktu: 02-08-2024 15:04:01",
+            "Masa aktif Anda akan berakhir pada 31/03/2025.",
+        )
+        for (message in messagesWithoutOtp) {
+            Assert.assertFalse(OtpDetector.containsOtp(message, bahasaLanguageTagList))
+        }
+
+        // containsOtp should return false, even when strong context word is present
+        // because it matches the false positive patterns.
+        val validContextWord = "otp"
+        for (message in messagesWithoutOtp) {
+            Assert.assertFalse(
+                OtpDetector.containsOtp("$validContextWord $message", bahasaLanguageTagList)
+            )
+            Assert.assertFalse(
+                OtpDetector.containsOtp("$message $validContextWord", bahasaLanguageTagList)
+            )
         }
     }
 

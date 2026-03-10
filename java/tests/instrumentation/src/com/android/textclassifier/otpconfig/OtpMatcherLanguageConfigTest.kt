@@ -256,6 +256,96 @@ class OtpMatcherLanguageConfigTest {
     }
 
     @Test
+    fun fromLanguageTag_bahasa_matchesOtpPatterns() {
+        val config =
+            OtpMatcherLanguageConfig.fromLanguageTag(OtpMatcherLanguageConfig.BAHASA_LANGUAGE_TAG)!!
+        val matcher = config.otpMatcher.get()!!
+
+        assertEquals(
+            setOf("1234"),
+            getAllMatches("Kode OTP kamu adalah [1234].", matcher)
+        )
+        assertEquals(
+            setOf("566677"),
+            getAllMatches("G-566677 adalah kode verifikasi Google Anda.", matcher)
+        )
+        assertEquals(
+            setOf("123-456"),
+            getAllMatches("Kode WhatsApp Anda 123-456", matcher)
+        )
+
+        // Too short (at least 4 digits for Bahasa)
+        matcher.reset("123")
+        assertFalse(matcher.find())
+
+        // Too long
+        matcher.reset("Merchant PAN        9360001430024541374")
+        assertFalse(matcher.find())
+    }
+
+    @Test
+    fun fromLanguageTag_bahasa_matchesFalsePositivePatterns() {
+        val config =
+            OtpMatcherLanguageConfig.fromLanguageTag(OtpMatcherLanguageConfig.BAHASA_LANGUAGE_TAG)!!
+        val matcher = config.falsePositiveMatcher.get()!!
+
+        // Date-like patterns
+        assertEquals(
+            setOf("06-06-2025"),
+            getAllMatches("berlaku 5 menit hingga 06-06-2025 15:42:00", matcher)
+        )
+        assertEquals(
+            setOf("2025-05-28"),
+            getAllMatches("Berlaku Sampai 2025-05-28 08:32", matcher)
+        )
+        assertEquals(
+            setOf("08/05/2025"),
+            getAllMatches("dan berlaku hingga 08/05/2025 08:51.", matcher)
+        )
+
+        // Phone-like patterns
+        assertEquals(
+            setOf("021 5086 0698"),
+            getAllMatches("Kami akan menghubungi kamu di nomor 021 5086 0698", matcher),
+        )
+    }
+
+    @Test
+    fun fromLanguageTag_bahasa_matchesContextWordsPatterns() {
+        val config =
+            OtpMatcherLanguageConfig.fromLanguageTag(OtpMatcherLanguageConfig.BAHASA_LANGUAGE_TAG)!!
+        val matcher = config.strongContextWordsMatcher.get()!!
+
+        // Your transaction authentication code is ####
+        matcher.reset("Kode Otentikasi transaksi Anda 607500")
+        assertTrue(matcher.find())
+
+        // #### is your one-time password
+        matcher.reset("037920 adalah One Time Password")
+        assertTrue(matcher.find())
+
+        // Do not give out the secret code
+        matcher.reset("JANGAN BERIKAN KODE RAHASIA")
+        assertTrue(matcher.find())
+
+        // Use this PIN to reset your password: ####.
+        matcher.reset("Gunakan PIN ini untuk mengatur ulang sandi Anda: 8852.")
+        assertTrue(matcher.find())
+
+        // Transaction code ###-#####.
+        matcher.reset("Kode transaksi 5555-0014216094.")
+        assertFalse(matcher.find())
+
+        // Was this offer/information helpful? If not, text STOP 360Kredi to 8000.
+        matcher.reset("Penawaran/info ini bermanfaat? Jika tidak, Kirim STOP 360Kredi ke 8000")
+        assertFalse(matcher.find())
+
+        // Order ### has arrived at your address on DD/MM/YYYY.
+        matcher.reset("Pesanan #250625F3M5CKYP telah tiba di alamatmu pada 30/06/2025.")
+        assertFalse(matcher.find())
+    }
+
+    @Test
     fun fromLanguageTag_unknown_returnNull() {
         val otpMatcherConfig = OtpMatcherLanguageConfig.fromLanguageTag("unknown")
         assertNull(otpMatcherConfig)

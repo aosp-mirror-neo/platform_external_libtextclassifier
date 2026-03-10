@@ -14,6 +14,7 @@ public final class OtpMatcherLanguageConfig {
     // ULocale supports many languages, but only includes constants for a few. Others must be
     // defined manually.
     static final String SPANISH_LANGUAGE_TAG = "es";
+    static final String BAHASA_LANGUAGE_TAG = "id";
 
     private static final int PATTERN_FLAGS =
             Pattern.DOTALL | Pattern.CASE_INSENSITIVE | Pattern.MULTILINE;
@@ -49,10 +50,21 @@ public final class OtpMatcherLanguageConfig {
             /* isSpaceDelimitedLanguage= */ true
     );
 
+    private static final OtpMatcherLanguageConfig BAHASA = new OtpMatcherLanguageConfig(
+            BAHASA_LANGUAGE_TAG,
+            BahasaOtpPattern.OTP_PATTERN,
+            BahasaOtpPattern.FALSE_POSITIVE_PATTERN,
+            BahasaOtpPattern.CONTEXT_WORDS_PATTERNS,
+            /* dependentTargetWordsPatterns= */ null,
+            /* dependentContextWordsPatterns= */ null,
+            /* isSpaceDelimitedLanguage= */ true
+    );
+
     static {
         CONFIG_MAP.put(ENGLISH.languageTag, ENGLISH);
         CONFIG_MAP.put(KOREAN.languageTag, KOREAN);
         CONFIG_MAP.put(SPANISH.languageTag, SPANISH);
+        CONFIG_MAP.put(BAHASA.languageTag, BAHASA);
     }
 
     private final String languageTag;
