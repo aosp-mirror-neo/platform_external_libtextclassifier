@@ -60,11 +60,22 @@ public final class OtpMatcherLanguageConfig {
             /* isSpaceDelimitedLanguage= */ true
     );
 
+    private static final OtpMatcherLanguageConfig JAPANESE = new OtpMatcherLanguageConfig(
+            ULocale.JAPANESE.toLanguageTag(),
+            JapaneseOtpPattern.OTP_PATTERN,
+            JapaneseOtpPattern.FALSE_POSITIVE_PATTERN,
+            JapaneseOtpPattern.STRONG_CONTEXT_WORDS_PATTERNS,
+            JapaneseOtpPattern.DEPENDENT_TARGET_WORDS_PATTERNS,
+            JapaneseOtpPattern.DEPENDENT_CONTEXT_WORDS_PATTERNS,
+            /* isSpaceDelimitedLanguage= */ false
+    );
+
     static {
         CONFIG_MAP.put(ENGLISH.languageTag, ENGLISH);
         CONFIG_MAP.put(KOREAN.languageTag, KOREAN);
         CONFIG_MAP.put(SPANISH.languageTag, SPANISH);
         CONFIG_MAP.put(BAHASA.languageTag, BAHASA);
+        CONFIG_MAP.put(JAPANESE.languageTag, JAPANESE);
     }
 
     private final String languageTag;

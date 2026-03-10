@@ -50,6 +50,9 @@ class OtpDetectorTest {
     private val bahasaLanguageTag = "id"
     private val bahasaLanguageTagList = listOf(bahasaLanguageTag)
 
+    private val japaneseLanguageTag = ULocale.JAPANESE.toLanguageTag()
+    private val japaneseLanguageTagList = listOf(japaneseLanguageTag)
+
     private lateinit var context: Context
     private lateinit var deviceConfig: TestingDeviceConfig
     private lateinit var settings: TextClassifierSettings
@@ -662,6 +665,87 @@ class OtpDetectorTest {
             Assert.assertFalse(
                 OtpDetector.containsOtp("$message $validContextWord", bahasaLanguageTagList)
             )
+        }
+    }
+
+    @Test
+    fun containsOtp_japanese_detectsOtpWithValidContextWord() {
+        val messagesWithOtp = listOf(
+            "認証コード：912728　をご入力ください", // Please enter the verification code
+            "2516 はアラクレ認証番号です。", // minimum 4 digits
+            "Google Pay 認証コードは<952687>です。", // surrounded by brackets
+            "G-177222 があなたの Google 確認コードです。誰とも共有しないでください。", // prefixed OTP
+            "お客様の6桁のコードは123456です" // no space between numbers and characters
+        )
+        for (message in messagesWithOtp) {
+            Assert.assertTrue(OtpDetector.containsOtp(message, japaneseLanguageTagList))
+        }
+    }
+
+    @Test
+    fun containsOtp_japanese_doesNotDetectNonOtp() {
+        val messagesWithoutOtp = listOf(
+            // Phone number
+            "ネクステージコールセンター\nTEL:0120-526-888",
+            "050－1234－5678\nこちら迄ご連絡下さい。",
+            // Currency
+            "現在の未払い金額は1292円です。お早めにお支払いください。",
+            // Date
+            "2024年7月28日日本 -> フィリピンマクタン・セブ国際空港 (CEB) - 5P9063",
+            "A187229777の商品が発送されました｡ お届け予定日2021/10/24｡ 詳細は配送状況をご確認ください。",
+            // Invoice number
+            "請求書番号【1555-4001-29】",
+        )
+        for (message in messagesWithoutOtp) {
+            Assert.assertFalse(OtpDetector.containsOtp(message, japaneseLanguageTagList))
+        }
+
+        // containsOtp should return false, even when strong context word is present
+        // because it matches the false positive patterns.
+        val validContextWord = "otp"
+        for (message in messagesWithoutOtp) {
+            Assert.assertFalse(
+                OtpDetector.containsOtp("$validContextWord $message", japaneseLanguageTagList)
+            )
+            Assert.assertFalse(
+                OtpDetector.containsOtp("$message $validContextWord", japaneseLanguageTagList)
+            )
+        }
+    }
+
+    @Test
+    fun containsOtp_japanese_detectsCooccurrenceContextWords() {
+        val otp = "123456"
+        val targetWords = listOf(
+            "コード", // code
+            "ワンタイム", // one-time
+        )
+        val contextWords = listOf(
+            "共有しないでください", // Please do not share
+            "有効期限", // expiration date
+        )
+        for (targetWord in targetWords) {
+            Assert.assertFalse(
+                "should not match target words when context words are not present",
+                OtpDetector.containsOtp("$targetWord $otp", japaneseLanguageTagList),
+            )
+        }
+        for (contextWord in contextWords) {
+            Assert.assertFalse(
+                "should not match context words when target words are not present",
+                OtpDetector.containsOtp("$otp $contextWord", japaneseLanguageTagList),
+            )
+        }
+        for (targetWord in targetWords) {
+            for (contextWord in contextWords) {
+                Assert.assertTrue(
+                    "should match when both the target word and the context word are present",
+                    OtpDetector.containsOtp(
+                        "$targetWord $otp $contextWord",
+                        japaneseLanguageTagList,
+                    ),
+                )
+            }
         }
     }
 

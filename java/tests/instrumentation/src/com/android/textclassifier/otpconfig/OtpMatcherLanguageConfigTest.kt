@@ -346,6 +346,109 @@ class OtpMatcherLanguageConfigTest {
     }
 
     @Test
+    fun fromLanguageTag_japanese_matchesOtpPatterns() {
+        val config = OtpMatcherLanguageConfig.fromLanguageTag(ULocale.JAPANESE.toLanguageTag())!!
+        val matcher = config.otpMatcher.get()!!
+
+        assertEquals(
+            setOf("5023"),
+            getAllMatches("認証コード：JK-5023", matcher)
+        )
+        assertEquals(
+            setOf("915210"),
+            getAllMatches("<#> 認証番号「915210」", matcher)
+        )
+        assertEquals(
+            setOf("444-777"),
+            getAllMatches("認証コードは444-777です。", matcher)
+        )
+        assertEquals(
+            setOf("522 987"),
+            getAllMatches("<#> 522 987があなた", matcher)
+        )
+
+        // Too short (at least 4 digits for Japanese)
+        matcher.reset("認証コード：YONY656")
+        assertFalse(matcher.find())
+
+        // Too long
+        matcher.reset("■ログインID：08075363215/パスワード：ご指定のパスワード")
+        assertFalse(matcher.find())
+    }
+
+    @Test
+    fun fromLanguageTag_japanese_matchesFalsePositivePatterns() {
+        val config = OtpMatcherLanguageConfig.fromLanguageTag(ULocale.JAPANESE.toLanguageTag())!!
+        val matcher = config.falsePositiveMatcher.get()!!
+
+        // Date-like patterns
+        assertEquals(
+            setOf("2024/06/06"),
+            getAllMatches("プリフラ予約確定\nうえだ様\n2024/06/06(木) 18:00", matcher)
+        )
+        assertEquals(
+            setOf("2025-01-30"),
+            getAllMatches("- 変更日時: 2025-01-30 17:45", matcher)
+        )
+        assertEquals(
+            setOf("2022.09.27"),
+            getAllMatches("受取期限2022.09.27", matcher)
+        )
+        assertEquals(
+            setOf("2025年"),
+            getAllMatches("ご請求年月：2025年06月", matcher)
+        )
+
+        // Phone-like patterns
+        assertEquals(
+            setOf("0120-123-411"),
+            getAllMatches("電話番号：0120-123-411", matcher)
+        )
+
+        // Currency-like patterns
+        assertEquals(
+            setOf("6000円"),
+            getAllMatches("本日開始！最大6000円分ギフト券を条件達成で全員に進呈！", matcher)
+        )
+
+        // Query string-like patterns
+        assertEquals(
+            setOf("=20220128"),
+            getAllMatches("utm_source=qlv&aam_medium=sms& utm campaign=20220128", matcher)
+        )
+    }
+
+    @Test
+    fun fromLanguageTag_japanese_matchesContextWordsPatterns() {
+        val config = OtpMatcherLanguageConfig.fromLanguageTag(ULocale.JAPANESE.toLanguageTag())!!
+        val matcher = config.strongContextWordsMatcher.get()!!
+
+        // One-time password
+        matcher.reset("ワンタイムパスワード：7714")
+        assertTrue(matcher.find())
+
+        // Verification code
+        matcher.reset("確認コード: 941749")
+        assertTrue(matcher.find())
+
+        // Verification number
+        matcher.reset("ドットマネーの認証番号は 546577 です。30分間有効です。")
+        assertTrue(matcher.find())
+
+        // Coupon code
+        matcher.reset("クーポンコード: AB5")
+        assertFalse(matcher.find())
+
+        // Amount to send
+        matcher.reset("送金額2650円")
+        assertFalse(matcher.find())
+
+        // Confirmation number
+        matcher.reset("確認番号：1610")
+        assertFalse(matcher.find())
+    }
+
+    @Test
     fun fromLanguageTag_unknown_returnNull() {
         val otpMatcherConfig = OtpMatcherLanguageConfig.fromLanguageTag("unknown")
         assertNull(otpMatcherConfig)
