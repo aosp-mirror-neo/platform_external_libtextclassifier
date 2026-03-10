@@ -449,6 +449,112 @@ class OtpMatcherLanguageConfigTest {
     }
 
     @Test
+    fun fromLanguageTag_german_matchesOtpPatterns() {
+        val config = OtpMatcherLanguageConfig.fromLanguageTag(ULocale.GERMAN.toLanguageTag())!!
+        val matcher = config.otpMatcher.get()!!
+
+        assertEquals(
+            setOf("723413"),
+            getAllMatches(
+                "Die einmalige PIN ist 723413 für die Transaktion über 109.20 CHF bei SBB CFF FFS",
+                matcher
+            )
+        )
+        assertEquals(
+            setOf("3161"),
+            getAllMatches("Dein FREENOW Verifizierungscode lautet 3161.", matcher)
+        )
+        assertEquals(
+            setOf("831-995"),
+            getAllMatches("<#> Dein WhatsApp Business Code: 831-995", matcher)
+        )
+        assertEquals(
+            setOf("116 389"),
+            getAllMatches("116 389 ist dein Instagram-Code.", matcher)
+        )
+
+        // Too short (at least 4 digits for German)
+        matcher.reset("175 ist Ihr Verifizierungscode für Doctolib.")
+        assertFalse(matcher.find())
+
+        // Too long
+        matcher.reset("Abmelden: Sende OUT an 015735999356")
+        assertFalse(matcher.find())
+    }
+
+    @Test
+    fun fromLanguageTag_german_matchesFalsePositivePatterns() {
+        val config = OtpMatcherLanguageConfig.fromLanguageTag(ULocale.GERMAN.toLanguageTag())!!
+        val matcher = config.falsePositiveMatcher.get()!!
+
+        // Date-like patterns
+        assertEquals(
+            setOf("11/11/2024"),
+            getAllMatches("Flughafen Frankfurt P2/P3 Terminal 1 Parking, 11/11/2024.", matcher)
+        )
+        assertEquals(
+            setOf("10.1.2025"),
+            getAllMatches("Vergleich aktualisiert (10.1.2025)", matcher)
+        )
+
+        // Phone-like patterns
+        assertEquals(
+            setOf("0800 330 1341"),
+            getAllMatches("Hier informieren oder 0800 330 1341. Ihre Telekom", matcher)
+        )
+        assertEquals(
+            setOf("069 5 8000 8000"),
+            getAllMatches("Bei Fragen:\n069 5 8000 8000 (24h Beratung)", matcher)
+        )
+
+        // Query string-like patterns
+        assertEquals(
+            setOf("=837163"),
+            getAllMatches("online.de/verify-paymorrow?code=837163&token=Nh", matcher)
+        )
+
+        // Currency-like patterns
+        assertEquals(
+            setOf("2500 EUR"),
+            getAllMatches("Wir haben Ihrem Konto 2500 EUR", matcher)
+        )
+        assertEquals(
+            setOf("1000€"),
+            getAllMatches("Willkommenspaket ist HIER und wartet noch. Bis zu 1000€ Bonus", matcher)
+        )
+    }
+
+    @Test
+    fun fromLanguageTag_german_matchesContextWordsPatterns() {
+        val config = OtpMatcherLanguageConfig.fromLanguageTag(ULocale.GERMAN.toLanguageTag())!!
+        val matcher = config.strongContextWordsMatcher.get()!!
+
+        // Your phone verification code
+        matcher.reset("Dein Telefonverifizierungscode")
+        assertTrue(matcher.find())
+
+        // Your SMS password: ######
+        matcher.reset("Ihr SMS-Kennwort:\n74476")
+        assertTrue(matcher.find())
+
+        // #### is your confirmation code. The confirmation code expires in ## minutes.
+        matcher.reset("8111 ist Ihr Bestätigungscode. Der Bestätigungscode läuft in 10 Minuten ab.")
+        assertTrue(matcher.find())
+
+        // Your discount code
+        matcher.reset("Ihr Rabattcode lautet: 48ZD53")
+        assertFalse(matcher.find())
+
+        // Parking expired
+        matcher.reset("Der Parkvorgang für NMSRJ3 ist abgelaufen")
+        assertFalse(matcher.find())
+
+        // Your promo code for your next order is
+        matcher.reset("Ihr Promo-Code für Ihre nächste Bestellung lautet: SOL20DE.")
+        assertFalse(matcher.find())
+    }
+
+    @Test
     fun fromLanguageTag_unknown_returnNull() {
         val otpMatcherConfig = OtpMatcherLanguageConfig.fromLanguageTag("unknown")
         assertNull(otpMatcherConfig)

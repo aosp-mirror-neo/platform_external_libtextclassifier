@@ -53,6 +53,9 @@ class OtpDetectorTest {
     private val japaneseLanguageTag = ULocale.JAPANESE.toLanguageTag()
     private val japaneseLanguageTagList = listOf(japaneseLanguageTag)
 
+    private val germanLanguageTag = ULocale.GERMAN.toLanguageTag()
+    private val germanLanguageTagList = listOf(germanLanguageTag)
+
     private lateinit var context: Context
     private lateinit var deviceConfig: TestingDeviceConfig
     private lateinit var settings: TextClassifierSettings
@@ -743,6 +746,88 @@ class OtpDetectorTest {
                     OtpDetector.containsOtp(
                         "$targetWord $otp $contextWord",
                         japaneseLanguageTagList,
+                    ),
+                )
+            }
+        }
+    }
+
+    @Test
+    fun containsOtp_german_detectsOtpWithValidContextWord() {
+        val messagesWithOtp = listOf(
+            "Deine Authentifzierungscode:\n78932626", // Typo of authentifizierungscode in real data
+            "Ihr Kurzcode 3435 zur Kontobestätigung.", // minimum 4 digits
+            "G-623456 ist Ihr Google-Bestätigungscode.", // prefixed OTP
+            "Verifizierungscode: 126-544. Nie weitergeben", // with dash
+        )
+        for (message in messagesWithOtp) {
+            Assert.assertTrue(OtpDetector.containsOtp(message, germanLanguageTagList))
+        }
+    }
+
+    @Test
+    fun containsOtp_german_doesNotDetectNonOtp() {
+        val messagesWithoutOtp = listOf(
+            // Date
+            "Der Abholtermin ist am 30.06.2025.",
+            // Phone number
+            "Mobilbox, neu: 1 Nachricht\n18/07/2025 10:36 von \"+4940741053211\".",
+            "Bei Fragen bitte Anruf unter   +495233383311",
+            // Currency
+            "Gehalt: 40-1000 Euro (Gehalt kann noch am selben Tag abgehoben werden)",
+            // Booking numbers
+            "Ihre Flugnummer lautet TK1511.",
+            "Ihre Buchungsnummer lautet: XZ392B\nAbflug: 14:25 Uhr von Berlin nach Antalya.",
+            "Ihr Profil-ID lautet: 028476128.",
+            "DHL Express 1232033773 wird HEUTE bis Tagesende zugestellt.",
+        )
+        for (message in messagesWithoutOtp) {
+            Assert.assertFalse(OtpDetector.containsOtp(message, germanLanguageTagList))
+        }
+
+        // containsOtp should return false, even when strong context word is present
+        // because it matches the false positive patterns.
+        val validContextWord = "otp"
+        for (message in messagesWithoutOtp) {
+            Assert.assertFalse(
+                OtpDetector.containsOtp("$validContextWord $message", germanLanguageTagList)
+            )
+            Assert.assertFalse(
+                OtpDetector.containsOtp("$message $validContextWord", germanLanguageTagList)
+            )
+        }
+    }
+
+    @Test
+    fun containsOtp_german_detectsCooccurrenceContextWords() {
+        val otp = "123456"
+        val targetWords = listOf(
+            "code",
+            "derCode",
+        )
+        val contextWords = listOf(
+            "Teile diesen mit niemandem;", // Don't share this with anyone.
+            "Er Ist 5 Minuten gültig.", // It's valid for 5 minutes.
+        )
+        for (targetWord in targetWords) {
+            Assert.assertFalse(
+                "should not match target words when context words are not present",
+                OtpDetector.containsOtp("$targetWord $otp", germanLanguageTagList),
+            )
+        }
+        for (contextWord in contextWords) {
+            Assert.assertFalse(
+                "should not match context words when target words are not present",
+                OtpDetector.containsOtp("$otp $contextWord", germanLanguageTagList),
+            )
+        }
+        for (targetWord in targetWords) {
+            for (contextWord in contextWords) {
+                Assert.assertTrue(
+                    "should match when both the target word and the context word are present",
+                    OtpDetector.containsOtp(
+                        "$targetWord $otp $contextWord",
+                        germanLanguageTagList,
                     ),
                 )
             }

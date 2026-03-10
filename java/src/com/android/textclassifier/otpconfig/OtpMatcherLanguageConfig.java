@@ -70,12 +70,23 @@ public final class OtpMatcherLanguageConfig {
             /* isSpaceDelimitedLanguage= */ false
     );
 
+    private static final OtpMatcherLanguageConfig GERMAN = new OtpMatcherLanguageConfig(
+            ULocale.GERMAN.toLanguageTag(),
+            GermanOtpPattern.OTP_PATTERN,
+            GermanOtpPattern.FALSE_POSITIVE_PATTERN,
+            GermanOtpPattern.STRONG_CONTEXT_WORDS_PATTERNS,
+            GermanOtpPattern.DEPENDENT_TARGET_WORDS_PATTERNS,
+            GermanOtpPattern.DEPENDENT_CONTEXT_WORDS_PATTERNS,
+            /* isSpaceDelimitedLanguage= */ true
+    );
+
     static {
         CONFIG_MAP.put(ENGLISH.languageTag, ENGLISH);
         CONFIG_MAP.put(KOREAN.languageTag, KOREAN);
         CONFIG_MAP.put(SPANISH.languageTag, SPANISH);
         CONFIG_MAP.put(BAHASA.languageTag, BAHASA);
         CONFIG_MAP.put(JAPANESE.languageTag, JAPANESE);
+        CONFIG_MAP.put(GERMAN.languageTag, GERMAN);
     }
 
     private final String languageTag;
