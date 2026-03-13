@@ -47,7 +47,7 @@ class OtpMatcherLanguageConfigTest {
         assertEquals(getAllMatches("<#>123456 is your code", matcher), setOf("123456"))
         assertEquals(getAllMatches("1234 is your one-time password", matcher), setOf("1234"))
 
-        matcher.reset("12") // Too short (at least 3 digits for english)
+        matcher.reset("123") // Too short (at least 4 digits for english)
         assertFalse(matcher.find())
     }
 

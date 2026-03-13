@@ -105,8 +105,7 @@ class OtpDetectorTest {
     @Test
     fun containsOtp_english_validPinPatterns() {
         val acceptedPinPatterns = listOf(
-            // 3 to 8-digit numeric pin.
-            "Your OTP is 123",
+            // 4 to 8-digit numeric pin.
             "Your OTP is 1234",
             "Your OTP is 12345",
             "Your OTP is 123456",
@@ -139,8 +138,8 @@ class OtpDetectorTest {
 
     @Test
     fun containsOtpLikePattern_english_length() {
-        val tooShortNumOnly = "12"
-        val minLenNumOnly = "123"
+        val tooShortNumOnly = "123"
+        val minLenNumOnly = "1234"
         val twoTriplets = "123 456"
         val tooShortTriplets = "12 345"
         val maxLen = "12345678"
@@ -165,9 +164,9 @@ class OtpDetectorTest {
 
     @Test
     fun containsOtpLikePattern_english_rejectsNonRomanAlphabeticalChars() {
-        val lowercase = "123ķ4"
-        val uppercase = "123Ŀ4"
-        val ideographicInMiddle = "12码45"
+        val lowercase = "1234ķ5"
+        val uppercase = "1234Ŀ5"
+        val ideographicInMiddle = "123码456"
 
         Assert.assertFalse(OtpDetector.containsOtpLikePattern(lowercase, englishLanguageTag))
         Assert.assertFalse(OtpDetector.containsOtpLikePattern(uppercase, englishLanguageTag))

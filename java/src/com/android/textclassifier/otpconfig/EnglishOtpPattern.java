@@ -32,10 +32,10 @@ final class EnglishOtpPattern {
         final String OTP_CHAR_WITH_DASH = format("(%s-?)", OTP_CHAR);
 
         /*
-         * Matches between 3 and 8 otp chars, with dashes in between. Here, we are assuming an OTP
-         * code is 3-8 characters long. The last char must not be followed by a dash.
+         * Matches between 4 and 8 otp chars, with dashes in between. Here, we are assuming an OTP
+         * code is 4-8 characters long. The last char must not be followed by a dash.
          */
-        final String THREE_TO_EIGHT_DIGITS_POTENTIALLY_WITH_DASH = format("(%s{2,7}%s)",
+        final String FOUR_TO_EIGHT_DIGITS_POTENTIALLY_WITH_DASH = format("(%s{3,7}%s)",
                 OTP_CHAR_WITH_DASH, OTP_CHAR);
 
         /* A regex matching two pairs of 3 digits (ex "123 456") */
@@ -45,13 +45,13 @@ final class EnglishOtpPattern {
          * Combining the regular expressions above, we get an OTP regex that does the following:
          * 1. Search for START,
          * 2. Match ONE of:
-         *    a. Numeric sequence of length 3-8 with optional dashes, or
+         *    a. Numeric sequence of length 4-8 with optional dashes, or
          *    b. Pair of 3-digit codes separated by a space,
          * 3. Match END.
-         * Examples: "6454", " 345 678.", "[YDT-456]"
+         * Examples: "6454", " 345 678.", "[YDT-3456]"
          */
         OTP_PATTERN = format("%s(%s|%s)%s",
-                START, THREE_TO_EIGHT_DIGITS_POTENTIALLY_WITH_DASH, SIX_DIGITS_WITH_SPACE, END);
+                START, FOUR_TO_EIGHT_DIGITS_POTENTIALLY_WITH_DASH, SIX_DIGITS_WITH_SPACE, END);
     }
 
     static final String FALSE_POSITIVE_PATTERN;
