@@ -12,14 +12,14 @@ final class KoreanOtpPattern {
      * "080.123.4567", "1234-5678", "02-1234-5678"
      */
     static final String FALSE_POSITIVE_PATTERN =
-            "(\\d{2,4}(?:-|\\.\\s?|/|년\\s?)\\d{1,4}(?:(?:-|\\.\\s?|/|월\\s?)\\d{1,4})?)";
+            "(\\d{2,4}(?:[-/]|[\\.년]\\s?)\\d{1,4}(?:(?:[-/]|[\\.월]\\s?)\\d{1,4})?)";
 
     /**
      * A list of regular expressions representing words found in an OTP context.
      */
     static final String[] CONTEXT_WORDS_PATTERNS = new String[]{
-            "(인증|비밀|승인)\\s?번호",
-            "(인증|보안|확인)\\s?코드",
+            "(?:인증|비밀|승인)\\s?번호",
+            "(?:인증|보안|확인)\\s?코드",
             "otp",
     };
 

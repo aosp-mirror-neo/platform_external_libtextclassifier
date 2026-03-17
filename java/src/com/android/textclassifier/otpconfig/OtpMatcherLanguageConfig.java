@@ -134,19 +134,18 @@ public final class OtpMatcherLanguageConfig {
      */
     private static ThreadLocal<Matcher> createDictionaryMatcher(
             String[] words, boolean isSpaceDelimitedLanguage) {
-        StringBuilder regex = new StringBuilder("(");
+        StringBuilder regex = new StringBuilder(isSpaceDelimitedLanguage ? "\\b" : "");
+        regex.append("(?:");
         for (int i = 0; i < words.length; i++) {
-            if (isSpaceDelimitedLanguage) {
-                String boundedWord = "\\b" + words[i] + "\\b";
-                regex.append(boundedWord);
-            } else {
-                regex.append(words[i]);
-            }
+            regex.append(words[i]);
             if (i != words.length - 1) {
                 regex.append("|");
             }
         }
         regex.append(")");
+        if (isSpaceDelimitedLanguage) {
+            regex.append("\\b");
+        }
         return createMatcher(regex.toString());
     }
 
