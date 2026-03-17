@@ -584,6 +584,42 @@ class OtpDetectorTest {
     }
 
     @Test
+    fun containsOtp_spanish_detectsCooccurrenceContextWords() {
+        val otp = "123456"
+        val targetWords = listOf(
+            "Usa clave",
+            "Use el código",
+        )
+        val contextWords = listOf(
+            "Válido por 5 minutos.", // Valid for 5 minutes
+            "para autenticar", // to authenticate
+        )
+        for (targetWord in targetWords) {
+            Assert.assertFalse(
+                "should not match target words when context words are not present",
+                OtpDetector.containsOtp("$targetWord $otp", spanishLanguageTagList),
+            )
+        }
+        for (contextWord in contextWords) {
+            Assert.assertFalse(
+                "should not match context words when target words are not present",
+                OtpDetector.containsOtp("$otp $contextWord", spanishLanguageTagList),
+            )
+        }
+        for (targetWord in targetWords) {
+            for (contextWord in contextWords) {
+                Assert.assertTrue(
+                    "should match when both the target word and the context word are present",
+                    OtpDetector.containsOtp(
+                        "$targetWord $otp $contextWord",
+                        spanishLanguageTagList,
+                    ),
+                )
+            }
+        }
+    }
+
+    @Test
     fun containsOtp_detectsLanguageAgnosticOtpSignature() {
         val validLanguageAgnosticOtp = listOf(
             "<#> Your MyApp code is 123456",

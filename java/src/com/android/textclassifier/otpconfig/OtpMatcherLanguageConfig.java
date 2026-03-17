@@ -24,6 +24,8 @@ public final class OtpMatcherLanguageConfig {
             EnglishOtpPattern.OTP_PATTERN,
             EnglishOtpPattern.FALSE_POSITIVE_PATTERN,
             EnglishOtpPattern.CONTEXT_WORDS_PATTERNS,
+            /* dependentTargetWordsPatterns= */ null,
+            /* dependentContextWordsPatterns= */ null,
             /* isSpaceDelimitedLanguage= */ true
     );
 
@@ -32,6 +34,8 @@ public final class OtpMatcherLanguageConfig {
             KoreanOtpPattern.OTP_PATTERN,
             KoreanOtpPattern.FALSE_POSITIVE_PATTERN,
             KoreanOtpPattern.CONTEXT_WORDS_PATTERNS,
+            /* dependentTargetWordsPatterns= */ null,
+            /* dependentContextWordsPatterns= */ null,
             /* isSpaceDelimitedLanguage= */ false
     );
 
@@ -39,7 +43,9 @@ public final class OtpMatcherLanguageConfig {
             SPANISH_LANGUAGE_TAG,
             SpanishOtpPattern.OTP_PATTERN,
             SpanishOtpPattern.FALSE_POSITIVE_PATTERN,
-            SpanishOtpPattern.CONTEXT_WORDS_PATTERNS,
+            SpanishOtpPattern.STRONG_CONTEXT_WORDS_PATTERNS,
+            SpanishOtpPattern.DEPENDENT_TARGET_WORDS_PATTERNS,
+            SpanishOtpPattern.DEPENDENT_CONTEXT_WORDS_PATTERNS,
             /* isSpaceDelimitedLanguage= */ true
     );
 
@@ -52,20 +58,32 @@ public final class OtpMatcherLanguageConfig {
     private final String languageTag;
     private final ThreadLocal<Matcher> otpMatcher;
     private final ThreadLocal<Matcher> falsePositiveMatcher;
-    private final ThreadLocal<Matcher> contextWordsMatcher;
+    private final ThreadLocal<Matcher> strongContextWordsMatcher;
+    @Nullable
+    private final ThreadLocal<Matcher> dependentTargetWordsMatcher;
+    @Nullable
+    private final ThreadLocal<Matcher> dependentContextWordsMatcher;
 
     private OtpMatcherLanguageConfig(
             String languageTag,
             String otpPatternStr,
             String falsePositivePatternStr,
-            String[] contextWordsPatterns,
+            String[] strongContextWordsPatterns,
+            @Nullable String[] dependentTargetWordsPatterns,
+            @Nullable String[] dependentContextWordsPatterns,
             boolean isSpaceDelimitedLanguage) {
         this.languageTag = languageTag;
 
         this.otpMatcher = createMatcher(otpPatternStr);
         this.falsePositiveMatcher = createMatcher(falsePositivePatternStr);
-        this.contextWordsMatcher =
-                createDictionaryMatcher(contextWordsPatterns, isSpaceDelimitedLanguage);
+        this.strongContextWordsMatcher = createDictionaryMatcher(
+                strongContextWordsPatterns, isSpaceDelimitedLanguage);
+        this.dependentTargetWordsMatcher =
+                dependentTargetWordsPatterns != null ? createDictionaryMatcher(
+                        dependentTargetWordsPatterns, isSpaceDelimitedLanguage) : null;
+        this.dependentContextWordsMatcher =
+                dependentContextWordsPatterns != null ? createDictionaryMatcher(
+                        dependentContextWordsPatterns, isSpaceDelimitedLanguage) : null;
     }
 
     /**
@@ -110,8 +128,18 @@ public final class OtpMatcherLanguageConfig {
         return falsePositiveMatcher;
     }
 
-    public ThreadLocal<Matcher> getContextWordsMatcher() {
-        return contextWordsMatcher;
+    public ThreadLocal<Matcher> getStrongContextWordsMatcher() {
+        return strongContextWordsMatcher;
+    }
+
+    @Nullable
+    public ThreadLocal<Matcher> getDependentTargetWordsMatcher() {
+        return dependentTargetWordsMatcher;
+    }
+
+    @Nullable
+    public ThreadLocal<Matcher> getDependentContextWordsMatcher() {
+        return dependentContextWordsMatcher;
     }
 
     @Nullable

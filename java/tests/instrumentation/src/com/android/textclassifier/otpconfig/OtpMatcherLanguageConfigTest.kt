@@ -42,7 +42,7 @@ class OtpMatcherLanguageConfigTest {
 
         val otpMatcher = otpMatcherConfig!!.otpMatcher.get()!!
         val falsePositiveMatcher = otpMatcherConfig!!.falsePositiveMatcher.get()!!
-        val contextWordsMatcher = otpMatcherConfig!!.contextWordsMatcher.get()!!
+        val contextWordsMatcher = otpMatcherConfig!!.strongContextWordsMatcher.get()!!
 
         assertEquals(getAllMatches("123-456", otpMatcher), setOf("123-456"))
         assertEquals(getAllMatches("Your OTP is 1234567", otpMatcher), setOf("1234567"))
@@ -103,7 +103,7 @@ class OtpMatcherLanguageConfigTest {
 
         val otpMatcher = otpMatcherConfig!!.otpMatcher.get()!!
         val falsePositiveMatcher = otpMatcherConfig!!.falsePositiveMatcher.get()!!
-        val contextWordsMatcher = otpMatcherConfig!!.contextWordsMatcher.get()!!
+        val contextWordsMatcher = otpMatcherConfig!!.strongContextWordsMatcher.get()!!
 
         // Valid OTP
         assertEquals(getAllMatches("[인증번호: 7890]", otpMatcher), setOf("7890"))
@@ -226,7 +226,7 @@ class OtpMatcherLanguageConfigTest {
     fun fromLanguageTag_spanish_matchesContextWordsPatterns() {
         val config =
             OtpMatcherLanguageConfig.fromLanguageTag(OtpMatcherLanguageConfig.SPANISH_LANGUAGE_TAG)
-        val matcher = config!!.contextWordsMatcher.get()!!
+        val matcher = config!!.strongContextWordsMatcher.get()!!
 
         // Your verification code is
         matcher.reset("Su codigo de verificacion es")
