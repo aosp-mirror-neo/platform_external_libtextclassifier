@@ -30,14 +30,19 @@ import com.google.android.textclassifier.AnnotatorModel
 import org.junit.Assert
 import org.junit.Assume
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.ArgumentMatchers.any
-import org.mockito.Mockito
-import org.mockito.MockitoAnnotations
+import org.mockito.Mock
+import org.mockito.Mockito.doReturn
+import org.mockito.junit.MockitoJUnit
 
 @RunWith(AndroidJUnit4::class)
 class OtpDetectorTest {
+    @get:Rule
+    val mockitoRule = MockitoJUnit.rule()
+
     private val englishLanguageTag = ULocale.ENGLISH.toLanguageTag()
     private val englishLanguageTagList = listOf(englishLanguageTag)
 
@@ -60,13 +65,14 @@ class OtpDetectorTest {
     private lateinit var deviceConfig: TestingDeviceConfig
     private lateinit var settings: TextClassifierSettings
     private lateinit var annotatorModelCache: LruCache<ModelFile, AnnotatorModel>
+
+    @Mock
     private lateinit var tc: TextClassifier
 
     @Before
     fun setup() {
         Assume.assumeTrue(TextClassifierUtils.isOtpClassificationEnabled())
 
-        MockitoAnnotations.initMocks(this)
         this.context =
             FakeContextBuilder()
                 .setAllIntentComponent(FakeContextBuilder.DEFAULT_COMPONENT)
@@ -75,12 +81,11 @@ class OtpDetectorTest {
         this.deviceConfig = TestingDeviceConfig()
         this.settings = TextClassifierSettings(deviceConfig, /* isWear= */ false)
         this.annotatorModelCache = LruCache(2)
-        this.tc = Mockito.mock(TextClassifier::class.java)
     }
 
     @Test
     fun containsOtp_providedTextClassifier_correctResult() {
-        Mockito.doReturn(TextLanguage.Builder().putLocale(ULocale.ENGLISH, 0.9f).build())
+        doReturn(TextLanguage.Builder().putLocale(ULocale.ENGLISH, 0.9f).build())
             .`when`(tc)
             .detectLanguage(any())
         Assert.assertFalse(OtpDetector.containsOtp("hello", this.tc))
@@ -90,7 +95,7 @@ class OtpDetectorTest {
     @Test
     fun containsOtp_providedTextClassifier_correctResultForLanguageAgnosticOtpSignature() {
         // Intentionally returning a language tag with low confidence.
-        Mockito.doReturn(TextLanguage.Builder().putLocale(ULocale.ENGLISH, 0.3f).build())
+        doReturn(TextLanguage.Builder().putLocale(ULocale.ENGLISH, 0.3f).build())
             .`when`(tc)
             .detectLanguage(any())
         Assert.assertFalse(OtpDetector.containsOtp("Your OTP code is 123456", this.tc))

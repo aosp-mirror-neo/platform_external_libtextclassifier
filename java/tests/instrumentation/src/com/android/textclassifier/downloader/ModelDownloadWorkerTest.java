@@ -55,10 +55,14 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+import org.mockito.junit.MockitoJUnit;
+import org.mockito.junit.MockitoRule;
 
 @RunWith(JUnit4.class)
 public final class ModelDownloadWorkerTest {
+
+  @Rule public MockitoRule mockitoRule = MockitoJUnit.rule();
+
   private static final long WORK_ID = 123456789L;
   private static final String MODEL_TYPE = ModelType.ANNOTATOR;
   private static final String MODEL_TYPE_2 = ModelType.ACTIONS_SUGGESTIONS;
@@ -153,8 +157,6 @@ public final class ModelDownloadWorkerTest {
 
   @Before
   public void setUp() {
-    MockitoAnnotations.initMocks(this);
-
     Context context = ApplicationProvider.getApplicationContext();
     this.deviceConfig = new TestingDeviceConfig();
     this.settings = new TextClassifierSettings(deviceConfig, /* isWear= */ false);
