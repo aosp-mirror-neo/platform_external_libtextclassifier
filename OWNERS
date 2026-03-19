@@ -1,4 +1,5 @@
 # Default code reviewers picked from top 3 or more developers.
 # Please update this list if you find better candidates.
 shend@google.com
-include platform/system/core:/janitors/OWNERS #{LAST_RESORT_SUGGESTION}
+mlcui@google.com
+hdchuong@google.com
