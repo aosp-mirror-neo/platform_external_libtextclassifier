@@ -36,129 +36,127 @@ class OtpMatcherLanguageConfigTest {
     }
 
     @Test
-    fun fromLanguageTag_english_matchEnglishPatterns() {
-        val otpMatcherConfig =
-            OtpMatcherLanguageConfig.fromLanguageTag(ULocale.ENGLISH.toLanguageTag())
+    fun fromLanguageTag_english_matchesOtpPatterns() {
+        val config = OtpMatcherLanguageConfig.fromLanguageTag(ULocale.ENGLISH.toLanguageTag())!!
+        val matcher = config.otpMatcher.get()!!
 
-        val otpMatcher = otpMatcherConfig!!.otpMatcher.get()!!
-        val falsePositiveMatcher = otpMatcherConfig!!.falsePositiveMatcher.get()!!
-        val contextWordsMatcher = otpMatcherConfig!!.strongContextWordsMatcher.get()!!
+        assertEquals(getAllMatches("123-456", matcher), setOf("123-456"))
+        assertEquals(getAllMatches("Your OTP is 1234567", matcher), setOf("1234567"))
+        assertEquals(getAllMatches("Your OTP is:12-34-56", matcher), setOf("12-34-56"))
+        assertEquals(getAllMatches("Your OTP is [123 456]", matcher), setOf("123 456"))
+        assertEquals(getAllMatches("<#>123456 is your code", matcher), setOf("123456"))
+        assertEquals(getAllMatches("1234 is your one-time password", matcher), setOf("1234"))
 
-        assertEquals(getAllMatches("123-456", otpMatcher), setOf("123-456"))
-        assertEquals(getAllMatches("Your OTP is 1234567", otpMatcher), setOf("1234567"))
-        assertEquals(getAllMatches("Your OTP is:12-34-56", otpMatcher), setOf("12-34-56"))
-        assertEquals(getAllMatches("Your OTP is [123 456]", otpMatcher), setOf("123 456"))
-        assertEquals(getAllMatches("<#>123456 is your code", otpMatcher), setOf("123456"))
-        assertEquals(getAllMatches("1234 is your one-time password", otpMatcher), setOf("1234"))
-
-        otpMatcher.reset("12") // Too short (at least 3 digits for english)
-        assertFalse(otpMatcher.find())
-
-        // Credit card ending
-        assertEquals(
-            getAllMatches("ending with 4412", falsePositiveMatcher), setOf("ending with 4412")
-        )
-        // Phone number
-        assertEquals(
-            getAllMatches("Call (650) 253-0000 for help", falsePositiveMatcher),
-            setOf("(650) 253-0000")
-        )
-        assertEquals(
-            getAllMatches("Reach us at 650 253-0000", falsePositiveMatcher), setOf("650 253-0000")
-        )
-        assertEquals(
-            getAllMatches("Please contact 650-253-0000", falsePositiveMatcher),
-            setOf("650-253-0000")
-        )
-        // Date
-        assertEquals(
-            getAllMatches("Expiry: 05-02-2026", falsePositiveMatcher), setOf("05-02-2026")
-        )
-        assertEquals(
-            getAllMatches("5-2-2026 or until further notice", falsePositiveMatcher),
-            setOf("5-2-2026")
-        )
-
-        assertFalse(falsePositiveMatcher.reset("ending with").find())
-
-        assertTrue(contextWordsMatcher.reset("otp").find())
-        assertTrue(contextWordsMatcher.reset("OTP").find()) // Case insensitive
-        assertTrue(contextWordsMatcher.reset("TAN").find()) // Transaction Authentication Number
-        assertTrue(contextWordsMatcher.reset("one-time passcode").find())
-        assertTrue(contextWordsMatcher.reset("two factor authentication").find())
-        assertTrue(contextWordsMatcher.reset("verify your identity").find())
-        assertTrue(contextWordsMatcher.reset("verification code").find())
-        assertTrue(contextWordsMatcher.reset("enter your pin").find())
-
-        assertFalse(contextWordsMatcher.reset("hello").find())
-        // Potentially voucher codes
-        assertFalse(contextWordsMatcher.reset("code 743a").find())
-        assertFalse(contextWordsMatcher.reset("code:bzy6").find())
+        matcher.reset("12") // Too short (at least 3 digits for english)
+        assertFalse(matcher.find())
     }
 
     @Test
-    fun fromLanguageTag_korean_matchKoreanPatterns() {
-        val otpMatcherConfig =
-            OtpMatcherLanguageConfig.fromLanguageTag(ULocale.KOREAN.toLanguageTag())
+    fun fromLanguageTag_english_matchesFalsePositivePatterns() {
+        val config = OtpMatcherLanguageConfig.fromLanguageTag(ULocale.ENGLISH.toLanguageTag())!!
+        val matcher = config.falsePositiveMatcher.get()!!
 
-        val otpMatcher = otpMatcherConfig!!.otpMatcher.get()!!
-        val falsePositiveMatcher = otpMatcherConfig!!.falsePositiveMatcher.get()!!
-        val contextWordsMatcher = otpMatcherConfig!!.strongContextWordsMatcher.get()!!
+        // Credit card ending
+        assertEquals(getAllMatches("ending with 4412", matcher), setOf("ending with 4412"))
+        // Phone number
+        assertEquals(
+            getAllMatches("Call (650) 253-0000 for help", matcher), setOf("(650) 253-0000")
+        )
+        assertEquals(getAllMatches("Reach us at 650 253-0000", matcher), setOf("650 253-0000"))
+        assertEquals(getAllMatches("Please contact 650-253-0000", matcher), setOf("650-253-0000"))
+        // Date
+        assertEquals(getAllMatches("Expiry: 05-02-2026", matcher), setOf("05-02-2026"))
+        assertEquals(getAllMatches("5-2-2026 or until further notice", matcher), setOf("5-2-2026"))
+
+        assertFalse(matcher.reset("ending with").find())
+    }
+
+    @Test
+    fun fromLanguageTag_english_matchesContextWordsPatterns() {
+        val config = OtpMatcherLanguageConfig.fromLanguageTag(ULocale.ENGLISH.toLanguageTag())!!
+        val matcher = config.strongContextWordsMatcher.get()!!
+
+        assertTrue(matcher.reset("otp").find())
+        assertTrue(matcher.reset("OTP").find()) // Case-insensitive
+        assertTrue(matcher.reset("TAN").find()) // Transaction Authentication Number
+        assertTrue(matcher.reset("one-time passcode").find())
+        assertTrue(matcher.reset("two factor authentication").find())
+        assertTrue(matcher.reset("verify your identity").find())
+        assertTrue(matcher.reset("verification code").find())
+        assertTrue(matcher.reset("enter your pin").find())
+
+        assertFalse(matcher.reset("hello").find())
+        // Potentially voucher codes
+        assertFalse(matcher.reset("code 743a").find())
+        assertFalse(matcher.reset("code:bzy6").find())
+    }
+
+    @Test
+    fun fromLanguageTag_korean_matchesOtpPatterns() {
+        val config =
+            OtpMatcherLanguageConfig.fromLanguageTag(ULocale.KOREAN.toLanguageTag())!!
+        val matcher = config.otpMatcher.get()!!
 
         // Valid OTP
-        assertEquals(getAllMatches("[인증번호: 7890]", otpMatcher), setOf("7890"))
+        assertEquals(getAllMatches("[인증번호: 7890]", matcher), setOf("7890"))
 
         // Too short. Need at least 4 digits for Korean.
-        otpMatcher.reset("456")
-        assertFalse(otpMatcher.find())
+        matcher.reset("456")
+        assertFalse(matcher.find())
 
         // Don't detect OTP with dashes for Korean.
-        otpMatcher.reset("123-456")
-        assertFalse(otpMatcher.find())
+        matcher.reset("123-456")
+        assertFalse(matcher.find())
+    }
+
+    @Test
+    fun fromLanguageTag_korean_matchesFalsePositivePatterns() {
+        val config =
+            OtpMatcherLanguageConfig.fromLanguageTag(ULocale.KOREAN.toLanguageTag())!!
+        val matcher = config.falsePositiveMatcher.get()!!
 
         // Date-like patterns
-        assertEquals(getAllMatches("- 기간 : 2026.01.01", falsePositiveMatcher), setOf("2026.01.01"))
-        assertEquals(getAllMatches("- 기간 : 2026.1.1", falsePositiveMatcher), setOf("2026.1.1"))
-        assertEquals(getAllMatches("- 기간 : 2026.1.10", falsePositiveMatcher), setOf("2026.1.10"))
-        assertEquals(
-            getAllMatches("- 기간 : 2026. 01. 01", falsePositiveMatcher), setOf("2026. 01. 01")
-        )
-        assertEquals(getAllMatches("- 기간 : 2026. 1. 1", falsePositiveMatcher), setOf("2026. 1. 1"))
-        assertEquals(
-            getAllMatches("- 기간 : 2026. 1. 10", falsePositiveMatcher), setOf("2026. 1. 10")
-        )
-        assertEquals(getAllMatches("- 기간 : 2026. 01.", falsePositiveMatcher), setOf("2026. 01"))
-        assertEquals(getAllMatches("- 기간 : 2026. 1.", falsePositiveMatcher), setOf("2026. 1"))
-        assertEquals(getAllMatches("- 기간 : 2026-01-01", falsePositiveMatcher), setOf("2026-01-01"))
-        assertEquals(getAllMatches("- 기간 : 2026-1-1", falsePositiveMatcher), setOf("2026-1-1"))
-        assertEquals(getAllMatches("- 기간 : 2026-1-10", falsePositiveMatcher), setOf("2026-1-10"))
-        assertEquals(getAllMatches("- 기간 : 2026/01/01", falsePositiveMatcher), setOf("2026/01/01"))
-        assertEquals(getAllMatches("- 기간 : 2026/1/1", falsePositiveMatcher), setOf("2026/1/1"))
-        assertEquals(getAllMatches("- 기간 : 2026/1/10", falsePositiveMatcher), setOf("2026/1/10"))
-        assertEquals(
-            getAllMatches("- 기간 : 2026년 1월 10일", falsePositiveMatcher), setOf("2026년 1월 10")
-        )
+        assertEquals(getAllMatches("- 기간 : 2026.01.01", matcher), setOf("2026.01.01"))
+        assertEquals(getAllMatches("- 기간 : 2026.1.1", matcher), setOf("2026.1.1"))
+        assertEquals(getAllMatches("- 기간 : 2026.1.10", matcher), setOf("2026.1.10"))
+        assertEquals(getAllMatches("- 기간 : 2026. 01. 01", matcher), setOf("2026. 01. 01"))
+        assertEquals(getAllMatches("- 기간 : 2026. 1. 1", matcher), setOf("2026. 1. 1"))
+        assertEquals(getAllMatches("- 기간 : 2026. 1. 10", matcher), setOf("2026. 1. 10"))
+        assertEquals(getAllMatches("- 기간 : 2026. 01.", matcher), setOf("2026. 01"))
+        assertEquals(getAllMatches("- 기간 : 2026. 1.", matcher), setOf("2026. 1"))
+        assertEquals(getAllMatches("- 기간 : 2026-01-01", matcher), setOf("2026-01-01"))
+        assertEquals(getAllMatches("- 기간 : 2026-1-1", matcher), setOf("2026-1-1"))
+        assertEquals(getAllMatches("- 기간 : 2026-1-10", matcher), setOf("2026-1-10"))
+        assertEquals(getAllMatches("- 기간 : 2026/01/01", matcher), setOf("2026/01/01"))
+        assertEquals(getAllMatches("- 기간 : 2026/1/1", matcher), setOf("2026/1/1"))
+        assertEquals(getAllMatches("- 기간 : 2026/1/10", matcher), setOf("2026/1/10"))
+        assertEquals(getAllMatches("- 기간 : 2026년 1월 10일", matcher), setOf("2026년 1월 10"))
 
         // Phone number-like patterns
-        assertEquals(getAllMatches("고객센터 문의 : 1234-5678", falsePositiveMatcher), setOf("1234-5678"))
-        assertEquals(
-            getAllMatches("무료수신거부 080.123.4567", falsePositiveMatcher), setOf("080.123.4567")
-        )
-        assertEquals(getAllMatches("☎ 02-1234-5678", falsePositiveMatcher), setOf("02-1234-5678"))
-        assertEquals(getAllMatches("(800) 826-9983", falsePositiveMatcher), setOf("826-9983"))
+        assertEquals(getAllMatches("고객센터 문의 : 1234-5678", matcher), setOf("1234-5678"))
+        assertEquals(getAllMatches("무료수신거부 080.123.4567", matcher), setOf("080.123.4567"))
+        assertEquals(getAllMatches("☎ 02-1234-5678", matcher), setOf("02-1234-5678"))
+        assertEquals(getAllMatches("(800) 826-9983", matcher), setOf("826-9983"))
 
         // Time-like patterns
-        assertFalse(falsePositiveMatcher.reset("12:15").find())
+        assertFalse(matcher.reset("12:15").find())
+    }
+
+    @Test
+    fun fromLanguageTag_korean_matchesContextWordsPatterns() {
+        val config =
+            OtpMatcherLanguageConfig.fromLanguageTag(ULocale.KOREAN.toLanguageTag())!!
+        val matcher = config.strongContextWordsMatcher.get()!!
 
         // Context words
-        assertTrue(contextWordsMatcher.reset("비밀번호 인증").find()) // Password authentication
-        assertFalse(contextWordsMatcher.reset("안녕하세요").find()) // Hello
-        assertFalse(contextWordsMatcher.reset("▶️픽업번호 : 112").find()) // Pickup number
-        assertFalse(contextWordsMatcher.reset("주문번호: ORD-K112981").find()) // Order id
-        assertFalse(contextWordsMatcher.reset("당신만을 위한 코드: STY2025OFF").find()) // Coupon code
+        assertTrue(matcher.reset("비밀번호 인증").find()) // Password authentication
+        assertFalse(matcher.reset("안녕하세요").find()) // Hello
+        assertFalse(matcher.reset("▶️픽업번호 : 112").find()) // Pickup number
+        assertFalse(matcher.reset("주문번호: ORD-K112981").find()) // Order id
+        assertFalse(matcher.reset("당신만을 위한 코드: STY2025OFF").find()) // Coupon code
 
         // Mixed languages
-        assertTrue(contextWordsMatcher.reset("[국제발신]649640는귀하의 Shopping OTP입니다.").find())
+        assertTrue(matcher.reset("[국제발신]649640는귀하의 Shopping OTP입니다.").find())
     }
 
     @Test
