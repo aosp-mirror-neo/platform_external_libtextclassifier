@@ -106,6 +106,6 @@ public class TextClassifierSmsRetrieverHandler {
             return true;
         }
         return TextClassifierUtils.hasPackageVisibility(context, callingPackageName,
-            targetPackageName);
+                targetPackageName);
     }
 }

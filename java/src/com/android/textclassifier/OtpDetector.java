@@ -23,6 +23,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.android.textclassifier.otpconfig.OtpMatcherLanguageConfig;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 
@@ -40,167 +41,173 @@ import java.util.regex.Pattern;
  */
 public class OtpDetector {
 
-  private static final float TC_THRESHOLD = 0.6f;
+    private static final float TC_THRESHOLD = 0.6f;
 
-  // Matches language-agnostic OTP signatures, such as "<#>" or "[#]" strictly at the beginning of
-  // the text (i.e., not using MULTILINE mode).
-  private static final Pattern LANGUAGE_AGNOSTIC_OTP_SIGNATURE_PATTERN =
-      Pattern.compile("^[<\\[]#[>\\]]");
-  private static final ThreadLocal<Matcher> LANGUAGE_AGNOSTIC_OTP_SIGNATURE_MATCHER =
-      ThreadLocal.withInitial(() -> LANGUAGE_AGNOSTIC_OTP_SIGNATURE_PATTERN.matcher(""));
+    // Matches language-agnostic OTP signatures, such as "<#>" or "[#]" strictly at the beginning of
+    // the text (i.e., not using MULTILINE mode).
+    private static final Pattern LANGUAGE_AGNOSTIC_OTP_SIGNATURE_PATTERN =
+            Pattern.compile("^[<\\[]#[>\\]]");
+    private static final ThreadLocal<Matcher> LANGUAGE_AGNOSTIC_OTP_SIGNATURE_MATCHER =
+            ThreadLocal.withInitial(() -> LANGUAGE_AGNOSTIC_OTP_SIGNATURE_PATTERN.matcher(""));
 
-  /**
-   * Checks if a string of text might contain an OTP, based on several regular expressions, and
-   * potentially using a textClassifier to eliminate false positives.
-   *
-   * <p><b>Note:</b> This method is meant to be called in Android V only. Android B+ should make
-   * TextClassifier request to determine if the text contains OTP.</p>
-   *
-   * <p><b>Important:</b> Signature of this method to be kept intact since it is intended for
-   * use by external modules via an exported library.
-   *
-   * @param text The input text to scan for OTP keywords. Must not be null.
-   * @param tc TextClassifier instance to be used to find the language of the text.
-   * @return {@code true} if an OTP is determined to be in the text, {@code false} otherwise.
-   */
-  public static boolean containsOtp(
-          @NonNull String text,
-          @NonNull TextClassifier tc) {
-    TextLanguage language = getTextLanguage(text, tc);
-    ULocale uLocale = getHighestConfidenceLocale(language);
-    List<String> detectedLanguageTags =
-        uLocale == null ? ImmutableList.of() : ImmutableList.of(uLocale.toLanguageTag());
-    return containsOtp(text, detectedLanguageTags);
-  }
-
-  /**
-   * Checks if a string of text might contain an OTP, based on several regular expressions.
-   *
-   * @param text The text whose content should be checked.
-   * @param detectedLanguageTags The language tags of the text.
-   * @return {@code true} if an OTP is determined to be in the text, {@code false} otherwise.
-   */
-  protected static boolean containsOtp(@NonNull String text, @NonNull List<String> detectedLanguageTags) {
-    // Detects language-agnostic OTP signatures such as <#> and [#] for all languages, even without
-    // explicit context word detection.
-    if (containsLanguageAgnosticOtpSignature(text)) {
-      return true;
+    /**
+     * Checks if a string of text might contain an OTP, based on several regular expressions, and
+     * potentially using a textClassifier to eliminate false positives.
+     *
+     * <p><b>Note:</b> This method is meant to be called in Android V only. Android B+ should make
+     * TextClassifier request to determine if the text contains OTP.</p>
+     *
+     * <p><b>Important:</b> Signature of this method to be kept intact since it is intended for
+     * use by external modules via an exported library.
+     *
+     * @param text The input text to scan for OTP keywords. Must not be null.
+     * @param tc   TextClassifier instance to be used to find the language of the text.
+     * @return {@code true} if an OTP is determined to be in the text, {@code false} otherwise.
+     */
+    public static boolean containsOtp(@NonNull String text, @NonNull TextClassifier tc) {
+        TextLanguage language = getTextLanguage(text, tc);
+        ULocale uLocale = getHighestConfidenceLocale(language);
+        List<String> detectedLanguageTags =
+                uLocale == null ? ImmutableList.of() : ImmutableList.of(uLocale.toLanguageTag());
+        return containsOtp(text, detectedLanguageTags);
     }
 
-    for (String languageTag : detectedLanguageTags) {
-      if (containsOtpLikePattern(text, languageTag) && containsOtpContextWord(text, languageTag)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  private static boolean containsLanguageAgnosticOtpSignature(@NonNull String text) {
-    return LANGUAGE_AGNOSTIC_OTP_SIGNATURE_MATCHER.get().reset(text).find();
-  }
-
-  /**
-   * Checks if the given text contains a pattern resembling an OTP.
-   *
-   * <p>This method attempts to identify such patterns by matching against a regular expression.
-   * Avoids false positives by checking for common patterns that might be mistaken for OTPs, such
-   * as phone numbers or dates.</p>
-   *
-   * @param text The text to be checked.
-   * @param languageTag The language tag (e.g., "en", "es", "fr") for which to check.
-   * @return {@code true} if the text contains an OTP-like pattern, {@code false} otherwise.
-   */
-  @VisibleForTesting
-  protected static boolean containsOtpLikePattern(@NonNull String text, @NonNull String languageTag) {
-    OtpMatcherLanguageConfig otpMatcherConfig = OtpMatcherLanguageConfig.fromLanguageTag(languageTag);
-    if (otpMatcherConfig == null) {
-      return false;
-    }
-
-    Set<String> otpMatches = getAllMatches(text, otpMatcherConfig.getOtpMatcher().get());
-    if (otpMatches.isEmpty()) {
-      return false;
-    }
-    Set<String> falsePositives = getAllMatches(text, otpMatcherConfig.getFalsePositiveMatcher().get());
-
-    // This optional, but having this would help with performance
-    // Example: "Your OTP code is 1234 and this is sent on 01-01-2001"
-    // At this point -> otpMatches: [1234, 01-01-2001] falsePositives=[01-01-2001]
-    // It filters "01-01-2001" in advance and continues to next checks with otpMatches: [1234]
-    otpMatches.removeAll(falsePositives);
-
-    // Following is to handle text like: "Your OTP can't be shared at this point, please call
-    // (888) 888-8888"
-    // otpMatches: [888-8888] falsePositives=[(888) 888-8888] final=[]
-    for (String otpMatch : otpMatches) {
-      boolean currentOtpIsFalsePositive = false;
-      for (String falsePositive : falsePositives) {
-        if (falsePositive.contains(otpMatch)) {
-          currentOtpIsFalsePositive = true;
-          break;
+    /**
+     * Checks if a string of text might contain an OTP, based on several regular expressions.
+     *
+     * @param text                 The text whose content should be checked.
+     * @param detectedLanguageTags The language tags of the text.
+     * @return {@code true} if an OTP is determined to be in the text, {@code false} otherwise.
+     */
+    protected static boolean containsOtp(
+            @NonNull String text, @NonNull List<String> detectedLanguageTags) {
+        // Detects language-agnostic OTP signatures such as <#> and [#] for all languages, even
+        // without explicit context word detection.
+        if (containsLanguageAgnosticOtpSignature(text)) {
+            return true;
         }
-      }
-      if (!currentOtpIsFalsePositive) {
-        return true;
-      }
-    }
-    return false;
-  }
 
-  /**
-   * Checks if the given text contains a language-specific context word or phrase associated with OTPs.
-   * This method uses regular expressions defined for specific languages to identify these words.
-   *
-   * @param text The text to check.
-   * @param languageTag The language tag (e.g., "en", "es", "fr") for which to check.
-   * @return {@code true} if the text contains a language-specific OTP word, {@code false} otherwise.
-   *         Returns {@code false} if no language-specific regex is defined for the given tag.
-   */
-  private static boolean containsOtpContextWord(@NonNull String text, @NonNull String languageTag) {
-    OtpMatcherLanguageConfig otpMatcherConfig = OtpMatcherLanguageConfig.fromLanguageTag(languageTag);
-    if (otpMatcherConfig == null) {
-      return false;
+        for (String languageTag : detectedLanguageTags) {
+            if (containsOtpLikePattern(text, languageTag)
+                    && containsOtpContextWord(text, languageTag)) {
+                return true;
+            }
+        }
+        return false;
     }
-    Matcher languageSpecificMatcher = otpMatcherConfig.getContextWordsMatcher().get();
-    if (languageSpecificMatcher == null) {
-      return false;
+
+    private static boolean containsLanguageAgnosticOtpSignature(@NonNull String text) {
+        return LANGUAGE_AGNOSTIC_OTP_SIGNATURE_MATCHER.get().reset(text).find();
     }
-    languageSpecificMatcher.reset(text);
-    return languageSpecificMatcher.find();
-  }
 
-  private static Set<String> getAllMatches(String text, Matcher regex) {
-    Set<String> matches = new HashSet<>();
-    regex.reset(text);
-    while (regex.find()) {
-      matches.add(regex.group());
+    /**
+     * Checks if the given text contains a pattern resembling an OTP.
+     *
+     * <p>This method attempts to identify such patterns by matching against a regular expression.
+     * Avoids false positives by checking for common patterns that might be mistaken for OTPs, such
+     * as phone numbers or dates.</p>
+     *
+     * @param text        The text to be checked.
+     * @param languageTag The language tag (e.g., "en", "es", "fr") for which to check.
+     * @return {@code true} if the text contains an OTP-like pattern, {@code false} otherwise.
+     */
+    @VisibleForTesting
+    protected static boolean containsOtpLikePattern(
+            @NonNull String text, @NonNull String languageTag) {
+        OtpMatcherLanguageConfig otpMatcherConfig =
+                OtpMatcherLanguageConfig.fromLanguageTag(languageTag);
+        if (otpMatcherConfig == null) {
+            return false;
+        }
+
+        Set<String> otpMatches = getAllMatches(text, otpMatcherConfig.getOtpMatcher().get());
+        if (otpMatches.isEmpty()) {
+            return false;
+        }
+        Set<String> falsePositives =
+                getAllMatches(text, otpMatcherConfig.getFalsePositiveMatcher().get());
+
+        // This optional, but having this would help with performance
+        // Example: "Your OTP code is 1234 and this is sent on 01-01-2001"
+        // At this point -> otpMatches: [1234, 01-01-2001] falsePositives=[01-01-2001]
+        // It filters "01-01-2001" in advance and continues to next checks with otpMatches: [1234]
+        otpMatches.removeAll(falsePositives);
+
+        // Following is to handle text like: "Your OTP can't be shared at this point, please call
+        // (888) 888-8888"
+        // otpMatches: [888-8888] falsePositives=[(888) 888-8888] final=[]
+        for (String otpMatch : otpMatches) {
+            boolean currentOtpIsFalsePositive = false;
+            for (String falsePositive : falsePositives) {
+                if (falsePositive.contains(otpMatch)) {
+                    currentOtpIsFalsePositive = true;
+                    break;
+                }
+            }
+            if (!currentOtpIsFalsePositive) {
+                return true;
+            }
+        }
+        return false;
     }
-    return matches;
-  }
 
-  // Tries to determine the language of the given text.
-  private static TextLanguage getTextLanguage(@NonNull String text, @NonNull TextClassifier tc) {
-    TextLanguage.Request langRequest = new TextLanguage.Request.Builder(text).build();
-    return tc.detectLanguage(langRequest);
-  }
-
-  // Will return the language with the highest confidence score that meets the minimum threshold,
-  // null otherwise
-  @Nullable
-  private static ULocale getHighestConfidenceLocale(@NonNull TextLanguage lang) {
-    float highestConfidence = 0;
-    ULocale highestConfidenceLocale = null;
-    for (int i = 0; i < lang.getLocaleHypothesisCount(); i++) {
-      ULocale locale = lang.getLocale(i);
-      float confidence = lang.getConfidenceScore(locale);
-      if (confidence >= TC_THRESHOLD
-              && confidence >= highestConfidence) {
-        highestConfidence = confidence;
-        highestConfidenceLocale = locale;
-      }
+    /**
+     * Checks if the given text contains a language-specific context word or phrase associated with
+     * OTPs.
+     * This method uses regular expressions defined for specific languages to identify these words.
+     *
+     * @param text        The text to check.
+     * @param languageTag The language tag (e.g., "en", "es", "fr") for which to check.
+     * @return {@code true} if the text contains a language-specific OTP word, {@code false}
+     * otherwise. Returns {@code false} if no language-specific regex is defined for the given tag.
+     */
+    private static boolean containsOtpContextWord(
+            @NonNull String text, @NonNull String languageTag) {
+        OtpMatcherLanguageConfig otpMatcherConfig =
+                OtpMatcherLanguageConfig.fromLanguageTag(languageTag);
+        if (otpMatcherConfig == null) {
+            return false;
+        }
+        Matcher languageSpecificMatcher = otpMatcherConfig.getContextWordsMatcher().get();
+        if (languageSpecificMatcher == null) {
+            return false;
+        }
+        languageSpecificMatcher.reset(text);
+        return languageSpecificMatcher.find();
     }
-    return highestConfidenceLocale;
-  }
 
-  private OtpDetector() {}
+    private static Set<String> getAllMatches(String text, Matcher regex) {
+        Set<String> matches = new HashSet<>();
+        regex.reset(text);
+        while (regex.find()) {
+            matches.add(regex.group());
+        }
+        return matches;
+    }
+
+    // Tries to determine the language of the given text.
+    private static TextLanguage getTextLanguage(@NonNull String text, @NonNull TextClassifier tc) {
+        TextLanguage.Request langRequest = new TextLanguage.Request.Builder(text).build();
+        return tc.detectLanguage(langRequest);
+    }
+
+    // Will return the language with the highest confidence score that meets the minimum threshold,
+    // null otherwise
+    @Nullable
+    private static ULocale getHighestConfidenceLocale(@NonNull TextLanguage lang) {
+        float highestConfidence = 0;
+        ULocale highestConfidenceLocale = null;
+        for (int i = 0; i < lang.getLocaleHypothesisCount(); i++) {
+            ULocale locale = lang.getLocale(i);
+            float confidence = lang.getConfidenceScore(locale);
+            if (confidence >= TC_THRESHOLD && confidence >= highestConfidence) {
+                highestConfidence = confidence;
+                highestConfidenceLocale = locale;
+            }
+        }
+        return highestConfidenceLocale;
+    }
+
+    private OtpDetector() {
+    }
 }
