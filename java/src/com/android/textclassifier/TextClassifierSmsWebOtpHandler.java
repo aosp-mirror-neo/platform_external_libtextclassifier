@@ -53,7 +53,8 @@ public class TextClassifierSmsWebOtpHandler {
     private static final ArrayList<String> NO_OTP_TRUSTED_PACKAGES = new ArrayList<>();
 
     public static void addLink(@NonNull TextLinks.Request request,
-            @NonNull TextLinks.Builder builder, @NonNull Context context) {
+            @NonNull TextLinks.Builder builder,
+            @NonNull Context context) {
         final String text = request.getText().toString();
         Matcher matcher = WEBOTP_MATCHER_CACHE.get().reset(text);
         if (matcher.find()) {
@@ -92,7 +93,7 @@ public class TextClassifierSmsWebOtpHandler {
                     }
                 }
             }
-        } catch(Exception e) {
+        } catch (Exception e) {
             // Fail gracefully if any exception is encountered.
             return NO_OTP_TRUSTED_PACKAGES;
         }
