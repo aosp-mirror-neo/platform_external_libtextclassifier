@@ -73,11 +73,14 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+import org.mockito.junit.MockitoJUnit;
+import org.mockito.junit.MockitoRule;
 
 @SmallTest
 @RunWith(AndroidJUnit4.class)
 public class TextClassifierImplTest {
+
+  @Rule public MockitoRule mockitoRule = MockitoJUnit.rule();
 
   private static final String TYPE_COPY = "copy";
   private static final LocaleList LOCALES = LocaleList.forLanguageTags("en-US");
@@ -96,7 +99,6 @@ public class TextClassifierImplTest {
 
   @Before
   public void setup() throws IOException {
-    MockitoAnnotations.initMocks(this);
     this.context =
         new FakeContextBuilder()
             .setAllIntentComponent(FakeContextBuilder.DEFAULT_COMPONENT)

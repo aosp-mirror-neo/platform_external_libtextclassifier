@@ -168,12 +168,30 @@ public class OtpDetector {
         if (otpMatcherConfig == null) {
             return false;
         }
-        Matcher languageSpecificMatcher = otpMatcherConfig.getContextWordsMatcher().get();
-        if (languageSpecificMatcher == null) {
+        Matcher strongContextWordsMatcher = otpMatcherConfig.getStrongContextWordsMatcher().get();
+        if (strongContextWordsMatcher == null) {
             return false;
         }
-        languageSpecificMatcher.reset(text);
-        return languageSpecificMatcher.find();
+        strongContextWordsMatcher.reset(text);
+        if (strongContextWordsMatcher.find()) {
+            return true;
+        }
+
+        // Detect co-occurrence of target words with dependent context words, if any.
+        // Only return true if the text matches at least one word from each matcher.
+        // For example, the word "code" alone is not a strong indicator of an OTP, unless there are
+        // supporting words like "valid until" or "do not share."
+        if (otpMatcherConfig.getDependentTargetWordsMatcher() == null
+                || otpMatcherConfig.getDependentContextWordsMatcher() == null) {
+            return false;
+        }
+        Matcher dependentTargetWordMatcher =
+                otpMatcherConfig.getDependentTargetWordsMatcher().get();
+        Matcher dependentContextWordMatcher =
+                otpMatcherConfig.getDependentContextWordsMatcher().get();
+        dependentTargetWordMatcher.reset(text);
+        dependentContextWordMatcher.reset(text);
+        return dependentTargetWordMatcher.find() && dependentContextWordMatcher.find();
     }
 
     private static Set<String> getAllMatches(String text, Matcher regex) {

@@ -14,6 +14,7 @@ public final class OtpMatcherLanguageConfig {
     // ULocale supports many languages, but only includes constants for a few. Others must be
     // defined manually.
     static final String SPANISH_LANGUAGE_TAG = "es";
+    static final String BAHASA_LANGUAGE_TAG = "id";
 
     private static final int PATTERN_FLAGS =
             Pattern.DOTALL | Pattern.CASE_INSENSITIVE | Pattern.MULTILINE;
@@ -24,6 +25,8 @@ public final class OtpMatcherLanguageConfig {
             EnglishOtpPattern.OTP_PATTERN,
             EnglishOtpPattern.FALSE_POSITIVE_PATTERN,
             EnglishOtpPattern.CONTEXT_WORDS_PATTERNS,
+            /* dependentTargetWordsPatterns= */ null,
+            /* dependentContextWordsPatterns= */ null,
             /* isSpaceDelimitedLanguage= */ true
     );
 
@@ -32,6 +35,8 @@ public final class OtpMatcherLanguageConfig {
             KoreanOtpPattern.OTP_PATTERN,
             KoreanOtpPattern.FALSE_POSITIVE_PATTERN,
             KoreanOtpPattern.CONTEXT_WORDS_PATTERNS,
+            /* dependentTargetWordsPatterns= */ null,
+            /* dependentContextWordsPatterns= */ null,
             /* isSpaceDelimitedLanguage= */ false
     );
 
@@ -39,7 +44,39 @@ public final class OtpMatcherLanguageConfig {
             SPANISH_LANGUAGE_TAG,
             SpanishOtpPattern.OTP_PATTERN,
             SpanishOtpPattern.FALSE_POSITIVE_PATTERN,
-            SpanishOtpPattern.CONTEXT_WORDS_PATTERNS,
+            SpanishOtpPattern.STRONG_CONTEXT_WORDS_PATTERNS,
+            SpanishOtpPattern.DEPENDENT_TARGET_WORDS_PATTERNS,
+            SpanishOtpPattern.DEPENDENT_CONTEXT_WORDS_PATTERNS,
+            /* isSpaceDelimitedLanguage= */ true
+    );
+
+    private static final OtpMatcherLanguageConfig BAHASA = new OtpMatcherLanguageConfig(
+            BAHASA_LANGUAGE_TAG,
+            BahasaOtpPattern.OTP_PATTERN,
+            BahasaOtpPattern.FALSE_POSITIVE_PATTERN,
+            BahasaOtpPattern.CONTEXT_WORDS_PATTERNS,
+            /* dependentTargetWordsPatterns= */ null,
+            /* dependentContextWordsPatterns= */ null,
+            /* isSpaceDelimitedLanguage= */ true
+    );
+
+    private static final OtpMatcherLanguageConfig JAPANESE = new OtpMatcherLanguageConfig(
+            ULocale.JAPANESE.toLanguageTag(),
+            JapaneseOtpPattern.OTP_PATTERN,
+            JapaneseOtpPattern.FALSE_POSITIVE_PATTERN,
+            JapaneseOtpPattern.STRONG_CONTEXT_WORDS_PATTERNS,
+            JapaneseOtpPattern.DEPENDENT_TARGET_WORDS_PATTERNS,
+            JapaneseOtpPattern.DEPENDENT_CONTEXT_WORDS_PATTERNS,
+            /* isSpaceDelimitedLanguage= */ false
+    );
+
+    private static final OtpMatcherLanguageConfig GERMAN = new OtpMatcherLanguageConfig(
+            ULocale.GERMAN.toLanguageTag(),
+            GermanOtpPattern.OTP_PATTERN,
+            GermanOtpPattern.FALSE_POSITIVE_PATTERN,
+            GermanOtpPattern.STRONG_CONTEXT_WORDS_PATTERNS,
+            GermanOtpPattern.DEPENDENT_TARGET_WORDS_PATTERNS,
+            GermanOtpPattern.DEPENDENT_CONTEXT_WORDS_PATTERNS,
             /* isSpaceDelimitedLanguage= */ true
     );
 
@@ -47,25 +84,40 @@ public final class OtpMatcherLanguageConfig {
         CONFIG_MAP.put(ENGLISH.languageTag, ENGLISH);
         CONFIG_MAP.put(KOREAN.languageTag, KOREAN);
         CONFIG_MAP.put(SPANISH.languageTag, SPANISH);
+        CONFIG_MAP.put(BAHASA.languageTag, BAHASA);
+        CONFIG_MAP.put(JAPANESE.languageTag, JAPANESE);
+        CONFIG_MAP.put(GERMAN.languageTag, GERMAN);
     }
 
     private final String languageTag;
     private final ThreadLocal<Matcher> otpMatcher;
     private final ThreadLocal<Matcher> falsePositiveMatcher;
-    private final ThreadLocal<Matcher> contextWordsMatcher;
+    private final ThreadLocal<Matcher> strongContextWordsMatcher;
+    @Nullable
+    private final ThreadLocal<Matcher> dependentTargetWordsMatcher;
+    @Nullable
+    private final ThreadLocal<Matcher> dependentContextWordsMatcher;
 
     private OtpMatcherLanguageConfig(
             String languageTag,
             String otpPatternStr,
             String falsePositivePatternStr,
-            String[] contextWordsPatterns,
+            String[] strongContextWordsPatterns,
+            @Nullable String[] dependentTargetWordsPatterns,
+            @Nullable String[] dependentContextWordsPatterns,
             boolean isSpaceDelimitedLanguage) {
         this.languageTag = languageTag;
 
         this.otpMatcher = createMatcher(otpPatternStr);
         this.falsePositiveMatcher = createMatcher(falsePositivePatternStr);
-        this.contextWordsMatcher =
-                createDictionaryMatcher(contextWordsPatterns, isSpaceDelimitedLanguage);
+        this.strongContextWordsMatcher = createDictionaryMatcher(
+                strongContextWordsPatterns, isSpaceDelimitedLanguage);
+        this.dependentTargetWordsMatcher =
+                dependentTargetWordsPatterns != null ? createDictionaryMatcher(
+                        dependentTargetWordsPatterns, isSpaceDelimitedLanguage) : null;
+        this.dependentContextWordsMatcher =
+                dependentContextWordsPatterns != null ? createDictionaryMatcher(
+                        dependentContextWordsPatterns, isSpaceDelimitedLanguage) : null;
     }
 
     /**
@@ -82,19 +134,18 @@ public final class OtpMatcherLanguageConfig {
      */
     private static ThreadLocal<Matcher> createDictionaryMatcher(
             String[] words, boolean isSpaceDelimitedLanguage) {
-        StringBuilder regex = new StringBuilder("(");
+        StringBuilder regex = new StringBuilder(isSpaceDelimitedLanguage ? "\\b" : "");
+        regex.append("(?:");
         for (int i = 0; i < words.length; i++) {
-            if (isSpaceDelimitedLanguage) {
-                String boundedWord = "\\b" + words[i] + "\\b";
-                regex.append(boundedWord);
-            } else {
-                regex.append(words[i]);
-            }
+            regex.append(words[i]);
             if (i != words.length - 1) {
                 regex.append("|");
             }
         }
         regex.append(")");
+        if (isSpaceDelimitedLanguage) {
+            regex.append("\\b");
+        }
         return createMatcher(regex.toString());
     }
 
@@ -110,8 +161,18 @@ public final class OtpMatcherLanguageConfig {
         return falsePositiveMatcher;
     }
 
-    public ThreadLocal<Matcher> getContextWordsMatcher() {
-        return contextWordsMatcher;
+    public ThreadLocal<Matcher> getStrongContextWordsMatcher() {
+        return strongContextWordsMatcher;
+    }
+
+    @Nullable
+    public ThreadLocal<Matcher> getDependentTargetWordsMatcher() {
+        return dependentTargetWordsMatcher;
+    }
+
+    @Nullable
+    public ThreadLocal<Matcher> getDependentContextWordsMatcher() {
+        return dependentContextWordsMatcher;
     }
 
     @Nullable

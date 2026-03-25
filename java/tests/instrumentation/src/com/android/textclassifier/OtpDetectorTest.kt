@@ -30,14 +30,19 @@ import com.google.android.textclassifier.AnnotatorModel
 import org.junit.Assert
 import org.junit.Assume
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.ArgumentMatchers.any
-import org.mockito.Mockito
-import org.mockito.MockitoAnnotations
+import org.mockito.Mock
+import org.mockito.Mockito.doReturn
+import org.mockito.junit.MockitoJUnit
 
 @RunWith(AndroidJUnit4::class)
 class OtpDetectorTest {
+    @get:Rule
+    val mockitoRule = MockitoJUnit.rule()
+
     private val englishLanguageTag = ULocale.ENGLISH.toLanguageTag()
     private val englishLanguageTagList = listOf(englishLanguageTag)
 
@@ -47,17 +52,27 @@ class OtpDetectorTest {
     private val spanishLanguageTag = "es"
     private val spanishLanguageTagList = listOf(spanishLanguageTag)
 
+    private val bahasaLanguageTag = "id"
+    private val bahasaLanguageTagList = listOf(bahasaLanguageTag)
+
+    private val japaneseLanguageTag = ULocale.JAPANESE.toLanguageTag()
+    private val japaneseLanguageTagList = listOf(japaneseLanguageTag)
+
+    private val germanLanguageTag = ULocale.GERMAN.toLanguageTag()
+    private val germanLanguageTagList = listOf(germanLanguageTag)
+
     private lateinit var context: Context
     private lateinit var deviceConfig: TestingDeviceConfig
     private lateinit var settings: TextClassifierSettings
     private lateinit var annotatorModelCache: LruCache<ModelFile, AnnotatorModel>
+
+    @Mock
     private lateinit var tc: TextClassifier
 
     @Before
     fun setup() {
         Assume.assumeTrue(TextClassifierUtils.isOtpClassificationEnabled())
 
-        MockitoAnnotations.initMocks(this)
         this.context =
             FakeContextBuilder()
                 .setAllIntentComponent(FakeContextBuilder.DEFAULT_COMPONENT)
@@ -66,12 +81,11 @@ class OtpDetectorTest {
         this.deviceConfig = TestingDeviceConfig()
         this.settings = TextClassifierSettings(deviceConfig, /* isWear= */ false)
         this.annotatorModelCache = LruCache(2)
-        this.tc = Mockito.mock(TextClassifier::class.java)
     }
 
     @Test
     fun containsOtp_providedTextClassifier_correctResult() {
-        Mockito.doReturn(TextLanguage.Builder().putLocale(ULocale.ENGLISH, 0.9f).build())
+        doReturn(TextLanguage.Builder().putLocale(ULocale.ENGLISH, 0.9f).build())
             .`when`(tc)
             .detectLanguage(any())
         Assert.assertFalse(OtpDetector.containsOtp("hello", this.tc))
@@ -81,7 +95,7 @@ class OtpDetectorTest {
     @Test
     fun containsOtp_providedTextClassifier_correctResultForLanguageAgnosticOtpSignature() {
         // Intentionally returning a language tag with low confidence.
-        Mockito.doReturn(TextLanguage.Builder().putLocale(ULocale.ENGLISH, 0.3f).build())
+        doReturn(TextLanguage.Builder().putLocale(ULocale.ENGLISH, 0.3f).build())
             .`when`(tc)
             .detectLanguage(any())
         Assert.assertFalse(OtpDetector.containsOtp("Your OTP code is 123456", this.tc))
@@ -91,8 +105,7 @@ class OtpDetectorTest {
     @Test
     fun containsOtp_english_validPinPatterns() {
         val acceptedPinPatterns = listOf(
-            // 3 to 8-digit numeric pin.
-            "Your OTP is 123",
+            // 4 to 8-digit numeric pin.
             "Your OTP is 1234",
             "Your OTP is 12345",
             "Your OTP is 123456",
@@ -125,8 +138,8 @@ class OtpDetectorTest {
 
     @Test
     fun containsOtpLikePattern_english_length() {
-        val tooShortNumOnly = "12"
-        val minLenNumOnly = "123"
+        val tooShortNumOnly = "123"
+        val minLenNumOnly = "1234"
         val twoTriplets = "123 456"
         val tooShortTriplets = "12 345"
         val maxLen = "12345678"
@@ -151,9 +164,9 @@ class OtpDetectorTest {
 
     @Test
     fun containsOtpLikePattern_english_rejectsNonRomanAlphabeticalChars() {
-        val lowercase = "123ķ4"
-        val uppercase = "123Ŀ4"
-        val ideographicInMiddle = "12码45"
+        val lowercase = "1234ķ5"
+        val uppercase = "1234Ŀ5"
+        val ideographicInMiddle = "123码456"
 
         Assert.assertFalse(OtpDetector.containsOtpLikePattern(lowercase, englishLanguageTag))
         Assert.assertFalse(OtpDetector.containsOtpLikePattern(uppercase, englishLanguageTag))
@@ -580,6 +593,248 @@ class OtpDetectorTest {
             Assert.assertFalse(
                 OtpDetector.containsOtp("$message $validContextWord", spanishLanguageTagList)
             )
+        }
+    }
+
+    @Test
+    fun containsOtp_spanish_detectsCooccurrenceContextWords() {
+        val otp = "123456"
+        val targetWords = listOf(
+            "Usa clave",
+            "Use el código",
+        )
+        val contextWords = listOf(
+            "Válido por 5 minutos.", // Valid for 5 minutes
+            "para autenticar", // to authenticate
+        )
+        for (targetWord in targetWords) {
+            Assert.assertFalse(
+                "should not match target words when context words are not present",
+                OtpDetector.containsOtp("$targetWord $otp", spanishLanguageTagList),
+            )
+        }
+        for (contextWord in contextWords) {
+            Assert.assertFalse(
+                "should not match context words when target words are not present",
+                OtpDetector.containsOtp("$otp $contextWord", spanishLanguageTagList),
+            )
+        }
+        for (targetWord in targetWords) {
+            for (contextWord in contextWords) {
+                Assert.assertTrue(
+                    "should match when both the target word and the context word are present",
+                    OtpDetector.containsOtp(
+                        "$targetWord $otp $contextWord",
+                        spanishLanguageTagList,
+                    ),
+                )
+            }
+        }
+    }
+
+    @Test
+    fun containsOtp_bahasa_detectsOtpWithValidContextWord() {
+        val messagesWithOtp = listOf(
+            "Kode konfirmasi Anda adalah 324126.",
+            "Gunakan OTP:1022 untuk login aplikasi", // minimum 4 digits
+            "Kode OTP kamu adalah [1234]. Berlaku 5 mnt.", // surrounded by brackets
+            "AdaKami-18236 adalah kode rahasia.", // prefixed OTP
+            "314-617 adalah kode verifikasi anda." // with dash
+        )
+        for (message in messagesWithOtp) {
+            Assert.assertTrue(OtpDetector.containsOtp(message, bahasaLanguageTagList))
+        }
+    }
+
+    @Test
+    fun containsOtp_bahasa_doesNotDetectNonOtp() {
+        val messagesWithoutOtp = listOf(
+            // Phone number
+            "Call 0804 122 1000",
+            "No Telepon : 021-5020 8787",
+            // Currency
+            "Isi ulang Rp10000.0 berhasil.",
+            // Date
+            "Waktu: 02-08-2024 15:04:01",
+            "Masa aktif Anda akan berakhir pada 31/03/2025.",
+        )
+        for (message in messagesWithoutOtp) {
+            Assert.assertFalse(OtpDetector.containsOtp(message, bahasaLanguageTagList))
+        }
+
+        // containsOtp should return false, even when strong context word is present
+        // because it matches the false positive patterns.
+        val validContextWord = "otp"
+        for (message in messagesWithoutOtp) {
+            Assert.assertFalse(
+                OtpDetector.containsOtp("$validContextWord $message", bahasaLanguageTagList)
+            )
+            Assert.assertFalse(
+                OtpDetector.containsOtp("$message $validContextWord", bahasaLanguageTagList)
+            )
+        }
+    }
+
+    @Test
+    fun containsOtp_japanese_detectsOtpWithValidContextWord() {
+        val messagesWithOtp = listOf(
+            "認証コード：912728　をご入力ください", // Please enter the verification code
+            "2516 はアラクレ認証番号です。", // minimum 4 digits
+            "Google Pay 認証コードは<952687>です。", // surrounded by brackets
+            "G-177222 があなたの Google 確認コードです。誰とも共有しないでください。", // prefixed OTP
+            "お客様の6桁のコードは123456です" // no space between numbers and characters
+        )
+        for (message in messagesWithOtp) {
+            Assert.assertTrue(OtpDetector.containsOtp(message, japaneseLanguageTagList))
+        }
+    }
+
+    @Test
+    fun containsOtp_japanese_doesNotDetectNonOtp() {
+        val messagesWithoutOtp = listOf(
+            // Phone number
+            "ネクステージコールセンター\nTEL:0120-526-888",
+            "050－1234－5678\nこちら迄ご連絡下さい。",
+            // Currency
+            "現在の未払い金額は1292円です。お早めにお支払いください。",
+            // Date
+            "2024年7月28日日本 -> フィリピンマクタン・セブ国際空港 (CEB) - 5P9063",
+            "A187229777の商品が発送されました｡ お届け予定日2021/10/24｡ 詳細は配送状況をご確認ください。",
+            // Invoice number
+            "請求書番号【1555-4001-29】",
+        )
+        for (message in messagesWithoutOtp) {
+            Assert.assertFalse(OtpDetector.containsOtp(message, japaneseLanguageTagList))
+        }
+
+        // containsOtp should return false, even when strong context word is present
+        // because it matches the false positive patterns.
+        val validContextWord = "otp"
+        for (message in messagesWithoutOtp) {
+            Assert.assertFalse(
+                OtpDetector.containsOtp("$validContextWord $message", japaneseLanguageTagList)
+            )
+            Assert.assertFalse(
+                OtpDetector.containsOtp("$message $validContextWord", japaneseLanguageTagList)
+            )
+        }
+    }
+
+    @Test
+    fun containsOtp_japanese_detectsCooccurrenceContextWords() {
+        val otp = "123456"
+        val targetWords = listOf(
+            "コード", // code
+            "ワンタイム", // one-time
+        )
+        val contextWords = listOf(
+            "共有しないでください", // Please do not share
+            "有効期限", // expiration date
+        )
+        for (targetWord in targetWords) {
+            Assert.assertFalse(
+                "should not match target words when context words are not present",
+                OtpDetector.containsOtp("$targetWord $otp", japaneseLanguageTagList),
+            )
+        }
+        for (contextWord in contextWords) {
+            Assert.assertFalse(
+                "should not match context words when target words are not present",
+                OtpDetector.containsOtp("$otp $contextWord", japaneseLanguageTagList),
+            )
+        }
+        for (targetWord in targetWords) {
+            for (contextWord in contextWords) {
+                Assert.assertTrue(
+                    "should match when both the target word and the context word are present",
+                    OtpDetector.containsOtp(
+                        "$targetWord $otp $contextWord",
+                        japaneseLanguageTagList,
+                    ),
+                )
+            }
+        }
+    }
+
+    @Test
+    fun containsOtp_german_detectsOtpWithValidContextWord() {
+        val messagesWithOtp = listOf(
+            "Deine Authentifzierungscode:\n78932626", // Typo of authentifizierungscode in real data
+            "Ihr Kurzcode 3435 zur Kontobestätigung.", // minimum 4 digits
+            "G-623456 ist Ihr Google-Bestätigungscode.", // prefixed OTP
+            "Verifizierungscode: 126-544. Nie weitergeben", // with dash
+        )
+        for (message in messagesWithOtp) {
+            Assert.assertTrue(OtpDetector.containsOtp(message, germanLanguageTagList))
+        }
+    }
+
+    @Test
+    fun containsOtp_german_doesNotDetectNonOtp() {
+        val messagesWithoutOtp = listOf(
+            // Date
+            "Der Abholtermin ist am 30.06.2025.",
+            // Phone number
+            "Mobilbox, neu: 1 Nachricht\n18/07/2025 10:36 von \"+4940741053211\".",
+            "Bei Fragen bitte Anruf unter   +495233383311",
+            // Currency
+            "Gehalt: 40-1000 Euro (Gehalt kann noch am selben Tag abgehoben werden)",
+            // Booking numbers
+            "Ihre Flugnummer lautet TK1511.",
+            "Ihre Buchungsnummer lautet: XZ392B\nAbflug: 14:25 Uhr von Berlin nach Antalya.",
+            "Ihr Profil-ID lautet: 028476128.",
+            "DHL Express 1232033773 wird HEUTE bis Tagesende zugestellt.",
+        )
+        for (message in messagesWithoutOtp) {
+            Assert.assertFalse(OtpDetector.containsOtp(message, germanLanguageTagList))
+        }
+
+        // containsOtp should return false, even when strong context word is present
+        // because it matches the false positive patterns.
+        val validContextWord = "otp"
+        for (message in messagesWithoutOtp) {
+            Assert.assertFalse(
+                OtpDetector.containsOtp("$validContextWord $message", germanLanguageTagList)
+            )
+            Assert.assertFalse(
+                OtpDetector.containsOtp("$message $validContextWord", germanLanguageTagList)
+            )
+        }
+    }
+
+    @Test
+    fun containsOtp_german_detectsCooccurrenceContextWords() {
+        val otp = "123456"
+        val targetWords = listOf(
+            "code",
+            "derCode",
+        )
+        val contextWords = listOf(
+            "Teile diesen mit niemandem;", // Don't share this with anyone.
+            "Er Ist 5 Minuten gültig.", // It's valid for 5 minutes.
+        )
+        for (targetWord in targetWords) {
+            Assert.assertFalse(
+                "should not match target words when context words are not present",
+                OtpDetector.containsOtp("$targetWord $otp", germanLanguageTagList),
+            )
+        }
+        for (contextWord in contextWords) {
+            Assert.assertFalse(
+                "should not match context words when target words are not present",
+                OtpDetector.containsOtp("$otp $contextWord", germanLanguageTagList),
+            )
+        }
+        for (targetWord in targetWords) {
+            for (contextWord in contextWords) {
+                Assert.assertTrue(
+                    "should match when both the target word and the context word are present",
+                    OtpDetector.containsOtp(
+                        "$targetWord $otp $contextWord",
+                        germanLanguageTagList,
+                    ),
+                )
+            }
         }
     }
 
