@@ -196,6 +196,14 @@ class OtpDetectorTest {
         val date = "01-01-2001"
         val singleDigitDate = "1-1-2001"
         val twoDigitYear = "1-1-01"
+        val dateWithSlashes = "01/01/2001"
+        val singleDigitDateWithSlashes = "1/1/2001"
+        val dateWithDots = "2001.01.01"
+        val singleDigitDateWithDots = "2001.1.1"
+        val dateWithShortEnglishMonth = "1 Jan 2001"
+        val dateWithLongEnglishMonth = "1 January 2001"
+        val dateWithShortEnglishMonthComma = "Jan 1, 2001"
+        val dateWithLongEnglishMonthComma = "January 1, 2001"
         val dateWithOtpAfter = "1-1-01 is the date of your code 3425"
         val dateWithOtpBefore = "your code 54-234-3 was sent on 1-1-01"
         val otpWithDashesButInvalidDate = "34-58-30"
@@ -204,6 +212,26 @@ class OtpDetectorTest {
         Assert.assertFalse(OtpDetector.containsOtpLikePattern(date, englishLanguageTag))
         Assert.assertFalse(OtpDetector.containsOtpLikePattern(singleDigitDate, englishLanguageTag))
         Assert.assertFalse(OtpDetector.containsOtpLikePattern(twoDigitYear, englishLanguageTag))
+        Assert.assertFalse(OtpDetector.containsOtpLikePattern(dateWithSlashes, englishLanguageTag))
+        Assert.assertFalse(
+            OtpDetector.containsOtpLikePattern(singleDigitDateWithSlashes, englishLanguageTag)
+        )
+        Assert.assertFalse(OtpDetector.containsOtpLikePattern(dateWithDots, englishLanguageTag))
+        Assert.assertFalse(
+            OtpDetector.containsOtpLikePattern(singleDigitDateWithDots, englishLanguageTag)
+        )
+        Assert.assertFalse(
+            OtpDetector.containsOtpLikePattern(dateWithShortEnglishMonth, englishLanguageTag)
+        )
+        Assert.assertFalse(
+            OtpDetector.containsOtpLikePattern(dateWithLongEnglishMonth, englishLanguageTag)
+        )
+        Assert.assertFalse(
+            OtpDetector.containsOtpLikePattern(dateWithShortEnglishMonthComma, englishLanguageTag)
+        )
+        Assert.assertFalse(
+            OtpDetector.containsOtpLikePattern(dateWithLongEnglishMonthComma, englishLanguageTag)
+        )
 
         Assert.assertTrue(OtpDetector.containsOtpLikePattern(dateWithOtpAfter, englishLanguageTag))
         Assert.assertTrue(OtpDetector.containsOtpLikePattern(dateWithOtpBefore, englishLanguageTag))
@@ -222,6 +250,10 @@ class OtpDetectorTest {
         val withDash = "(888) 888-8888"
         val allDashes = "888-888-8888"
         val allDashesWithParen = "(888)-888-8888"
+        val shortFormDash = "8888-8888"
+        val shortFormSpace = "8888 8888"
+        val callNumber = "call 8888888"
+        val callNumberWithDash = "dial 88-88-88"
 
         Assert.assertFalse(OtpDetector.containsOtpLikePattern(parens, englishLanguageTag))
         Assert.assertFalse(OtpDetector.containsOtpLikePattern(allSpaces, englishLanguageTag))
@@ -229,6 +261,35 @@ class OtpDetectorTest {
         Assert.assertFalse(OtpDetector.containsOtpLikePattern(allDashes, englishLanguageTag))
         Assert.assertFalse(
             OtpDetector.containsOtpLikePattern(allDashesWithParen, englishLanguageTag)
+        )
+        Assert.assertFalse(OtpDetector.containsOtpLikePattern(shortFormDash, englishLanguageTag))
+        Assert.assertFalse(OtpDetector.containsOtpLikePattern(shortFormSpace, englishLanguageTag))
+        Assert.assertFalse(OtpDetector.containsOtpLikePattern(callNumber, englishLanguageTag))
+        Assert.assertFalse(
+            OtpDetector.containsOtpLikePattern(callNumberWithDash, englishLanguageTag)
+        )
+    }
+
+    @Test
+    fun containsOtpLikePattern_english_currencyExclusion() {
+        val dollarSign = "$1000"
+        val dollarSignWithSpace = "$ 1000"
+        val euroSign = "€1000"
+        val euroSignWithSpace = "€ 1000"
+        val poundSign = "£1000"
+        val poundSignWithSpace = "£ 1000"
+
+        Assert.assertFalse(OtpDetector.containsOtpLikePattern(dollarSign, englishLanguageTag))
+        Assert.assertFalse(
+            OtpDetector.containsOtpLikePattern(dollarSignWithSpace, englishLanguageTag)
+        )
+        Assert.assertFalse(OtpDetector.containsOtpLikePattern(euroSign, englishLanguageTag))
+        Assert.assertFalse(
+            OtpDetector.containsOtpLikePattern(euroSignWithSpace, englishLanguageTag)
+        )
+        Assert.assertFalse(OtpDetector.containsOtpLikePattern(poundSign, englishLanguageTag))
+        Assert.assertFalse(
+            OtpDetector.containsOtpLikePattern(poundSignWithSpace, englishLanguageTag)
         )
     }
 

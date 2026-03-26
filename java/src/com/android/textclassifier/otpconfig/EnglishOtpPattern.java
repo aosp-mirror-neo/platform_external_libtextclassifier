@@ -58,21 +58,44 @@ final class EnglishOtpPattern {
 
     static {
         /*
-         * A Date regular expression. Looks for dates with the month, day, and year separated by
-         * dashes. Handles one and two digit months and days, and four or two-digit years. It makes
-         * the following assumptions: Dates and months will never be higher than 39. If a four-digit
-         * year is used, the leading digit will be 1 or 2.
+         * Regular expression for short-form and long-form month names in English.
          */
-        final String DATE_WITH_DASHES = "[0-3]?\\d-[0-3]?\\d-(?:[12]\\d)?\\d\\d";
+        final String MONTH_PATTERN =
+                "(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|June?|July?|Aug(?:ust)?"
+                        + "|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)";
 
         /*
-         * Matches a ten-digit phone number, when the area code is separated by a space or dash.
+         * A Date regular expression. Looks for dates with the month, day, and year separated by
+         * dashes, slashes, or periods. Handles one and two digit months and days, and two or four
+         * digit years. It makes the following assumptions: Dates and months will never be higher
+         * than 39. If a four-digit year is used, the leading digit will be 1 or 2.
+         */
+        final String DATE_PATTERN = format(
+                // DD/MM/(YY)YY, MM/DD/(YY)YY, DD-MM-(YY)YY, MM-DD-(YY)YY, DD.MM.YYYY, MM.DD.YYYY
+                "(?:[0-3]?\\d[-/\\.][0-3]?\\d[-/\\.](?:[12]\\d)?\\d{2}" +
+                        // YYYY-MM-DD, YYYY/MM/DD, YYYY.MM.DD
+                        "|(?:[12]\\d)?\\d{2}[-/\\.][0-3]?\\d[-/\\.][0-3]?\\d" +
+                        // DD MMM (YY)YY, DD-MMM-(YY)YY, DD/MMM/(YY)YY
+                        "|[0-3]?\\d[-\\s/]%s[-\\s/](?:[12]\\d)?\\d{2}" +
+                        // MMM DD(,) (YY)YY
+                        "|%s\\s[0-3]?\\d,?\\s(?:[12]\\d)?\\d{2})",
+                MONTH_PATTERN, MONTH_PATTERN);
+
+        /*
+         * Matches phone numbers.
          * Supports optional parentheses around the area code, and an optional dash or space in
-         * between the rest of the numbers. This format registers as an otp match due to the space
+         * between the rest of the numbers. This format registers as an OTP match due to the space
          * between the area code and the rest, but shouldn't.
          */
-        final String PHONE_WITH_SPACE = "\\(?\\d{3}\\)?[-\\s]?\\d{3}[-\\s]?\\d{4}";
+        final String PHONE_NUMBER_PATTERN =
+                "(?:\\(?\\d{3}\\)?[\\s-]?\\d{3}[\\s-]?\\d{4}"
+                        + "|\\d{4}[\\s-]\\d{4}"
+                        + "|(?:call|calling|dialing|dial)\\s?\\d{2,8}([\\s-]\\d{2,8}){0,3})";
 
+        /*
+         * Matches currency amounts, indicated by symbols.
+         */
+        final String CURRENCY_AMOUNT_PATTERN = "[\\$€£]\\s?\\d{4,8}";
 
         /*
          * Matches informational last digits of identifiers (e.g. last 4 digits of credit card,
@@ -84,8 +107,9 @@ final class EnglishOtpPattern {
          * A combination of common false positives. These matches are expected to be longer than
          * (or equal in length to) OTP matches.
          */
-        FALSE_POSITIVE_PATTERN = format("%s(%s|%s|%s)%s",
-                START, DATE_WITH_DASHES, PHONE_WITH_SPACE, LAST_DIGITS_OF_IDENTIFIER, END);
+        FALSE_POSITIVE_PATTERN = format("%s(%s|%s|%s|%s)%s",
+                START, DATE_PATTERN, PHONE_NUMBER_PATTERN, CURRENCY_AMOUNT_PATTERN,
+                LAST_DIGITS_OF_IDENTIFIER, END);
     }
 
     /**
